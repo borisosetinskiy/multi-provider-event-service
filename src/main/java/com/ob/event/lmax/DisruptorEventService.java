@@ -75,4 +75,24 @@ public class DisruptorEventService implements EventService<Future> {
     public void shutdownNode(EventNode node) {
 
     }
+
+    @Override
+    public EventNode getEventNode(String name) {
+        return null;
+    }
+
+    @Override
+    public void subscribeEvent(EventNode subscriber, Object event) {
+
+    }
+
+    @Override
+    public void removeEvent(EventNode subscriber, Object event) {
+
+    }
+
+    @Override
+    public void notifyEvent(Object event) {
+
+    }
 }

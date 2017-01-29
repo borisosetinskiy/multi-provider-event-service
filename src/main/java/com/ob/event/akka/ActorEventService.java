@@ -31,11 +31,15 @@ public class ActorEventService extends WithActorService implements EventService<
     private ExecutionContext ec = ExecutionContexts.global();
     private Map<String, EventAgent<Object, Future>> agents = Maps.newConcurrentMap();
     private Map<String, Set<EventNode>> nodeToListener = Maps.newConcurrentMap();
-    private Map<String, Set<EventNode>> listenerToNode = Maps.newConcurrentMap();
+    private Map<String, Set<String>> listenerToNode = Maps.newConcurrentMap();
+    private Map<Object, Set<EventNode>> eventToListener = Maps.newConcurrentMap();
+    private Map<String, Set<Object>> listenerToEvent = Maps.newConcurrentMap();
     private Map<String, EventNode> eventNodes = Maps.newConcurrentMap();
     private Lock agentLock = new ReentrantLock();
     private Lock nodeLock = new ReentrantLock();
+    private Lock eventLock = new ReentrantLock();
 
+    /*Unblocked method*/
     @Override
     public void tellEvent(EventNode sender, EventNode recipient, Object event) {
         ActorRef recipient0 = (ActorRef)recipient.unwrap();
@@ -44,16 +48,19 @@ public class ActorEventService extends WithActorService implements EventService<
         }
     }
 
+    /*Unblocked method*/
     @Override
     public  void tellEvent(EventNode sender, String recipient, Object event) {
         actorService.getActorSystem().actorSelection(recipient).tell(event, sender(sender));
     }
 
+    /*Unblocked method*/
     @Override
     public void publishEvent(Object event) {
         actorService.getActorSystem().eventStream().publish(event);
     }
 
+    /*Unblocked method*/
     @Override
     public void subscribeEventStream(EventNode subscriber, Object event) {
         if(event instanceof Class){
@@ -61,6 +68,7 @@ public class ActorEventService extends WithActorService implements EventService<
         }
     }
 
+    /*Unblocked method*/
     @Override
     public void removeEventStream(EventNode subscriber, Object event) {
         if(event instanceof Class){
@@ -101,12 +109,12 @@ public class ActorEventService extends WithActorService implements EventService<
                 nodeToListener.put(name, listeners);
             }
             listeners.add(subscriber);
-            Set<EventNode> nodes = listenerToNode.get(subscriber.name());
+            Set<String> nodes = listenerToNode.get(subscriber.name());
             if(nodes == null){
                 nodes = Sets.newConcurrentHashSet();
                 listenerToNode.put(subscriber.name(), nodes);
             }
-            nodes.add(eventNode);
+            nodes.add(eventNode.name());
         }catch (Exception e){}finally {
             nodeLock.unlock();
         }
@@ -114,7 +122,6 @@ public class ActorEventService extends WithActorService implements EventService<
     void remove0(String name, EventNode subscriber){
         nodeLock.lock();
         try{
-            final EventNode eventNode = eventNodes.get(name);
             Set<EventNode> listeners = nodeToListener.get(name);
             if(listeners != null){
                 listeners.remove(subscriber);
@@ -122,10 +129,9 @@ public class ActorEventService extends WithActorService implements EventService<
                     nodeToListener.remove(name);
                 }
             }
-            if(eventNode == null) return;
-            Set<EventNode> nodes = listenerToNode.get(subscriber.name());
+            Set<String> nodes = listenerToNode.get(subscriber.name());
             if(nodes != null){
-                nodes.remove(eventNode);
+                nodes.remove(name);
                 if(nodes.isEmpty()){
                     listenerToNode.remove(subscriber.name());
                 }
@@ -141,6 +147,7 @@ public class ActorEventService extends WithActorService implements EventService<
         return agents.get(agentName);
     }
 
+    /*Blocked method*/
     @Override
     public EventAgent registryAgent(String name, EventAgentScope scope) {
         EventAgent eventAgent = null;
@@ -157,6 +164,7 @@ public class ActorEventService extends WithActorService implements EventService<
         return eventAgent;
     }
 
+    /*Unblocked method*/
     @Override
     public <V> Future<V> execute(Callable<V> callable) {
         return future(callable, ec);
@@ -171,6 +179,7 @@ public class ActorEventService extends WithActorService implements EventService<
                 return name;
             }
 
+            /*Unblocked method*/
             @Override
             public void scheduledEvent(final Object event, final TimeUnit tu, final int time) {
                 scheduleEvent0(actor, actor, event, tu, time);
@@ -187,11 +196,13 @@ public class ActorEventService extends WithActorService implements EventService<
 
             }
 
+            /*Unblocked method*/
             @Override
             public void tell(Object event) {
                 tellEvent(this, this, event);
             }
 
+            /*Blocked method*/
             @Override
             public void onEvent(Object event) {
                 Set<EventNode> listeners = nodeToListener.get(name);
@@ -225,10 +236,12 @@ public class ActorEventService extends WithActorService implements EventService<
     @Override
     public void shutdownNode(EventNode node) {
         try{
-            Set<EventNode> nodes = listenerToNode.get(node.name());
+            Set<String> nodes = listenerToNode.get(node.name());
             if(nodes != null){
-                nodes.forEach(subscriber -> {
-                    remove0(node.name(), subscriber);
+                nodes.forEach(subscriberName -> {
+                    EventNode subscriber = eventNodes.get(subscriberName);
+                    if(subscriber!=null)
+                        remove0(node.name(), subscriber);
                 });
             }
             eventNodes.remove(node.name());
@@ -237,6 +250,11 @@ public class ActorEventService extends WithActorService implements EventService<
                 ActorUtil.gracefulReadyStop((ActorRef) node.unwrap());
             }catch (Exception e0){}
         }
+    }
+
+    @Override
+    public EventNode getEventNode(String name) {
+        return eventNodes.get(name);
     }
 
     private ActorRef sender(EventNode<ActorRef> sender){
@@ -267,5 +285,62 @@ public class ActorEventService extends WithActorService implements EventService<
                 return agent.future();
             }
         };
+    }
+    /*Blocked method*/
+    @Override
+    public void subscribeEvent(EventNode subscriber, Object event) {
+        eventLock.lock();
+        try{
+            Set<EventNode> listeners = eventToListener.get(event);
+            if(listeners == null){
+                listeners = Sets.newConcurrentHashSet();
+                eventToListener.put(event, listeners);
+            }
+            listeners.add(subscriber);
+            Set<Object> events = listenerToEvent.get(subscriber.name());
+            if(events == null){
+                events = Sets.newConcurrentHashSet();
+                listenerToEvent.put(subscriber.name(), events);
+            }
+            events.add(event);
+        }catch (Exception e){}finally {
+            eventLock.unlock();
+        }
+    }
+
+    /*Blocked method*/
+    @Override
+    public void removeEvent(EventNode subscriber, Object event) {
+        nodeLock.lock();
+        try{
+            Set<EventNode> listeners = eventToListener.get(event);
+            if(listeners != null){
+                listeners.remove(subscriber);
+                if(listeners.isEmpty()){
+                    eventToListener.remove(event);
+                }
+            }
+
+            Set<Object> events = listenerToEvent.get(subscriber.name());
+            if(events != null){
+                events.remove(subscriber.name());
+                if(events.isEmpty()){
+                    listenerToEvent.remove(subscriber.name());
+                }
+            }
+        }catch (Exception e){}finally {
+            nodeLock.unlock();
+        }
+    }
+
+    /*Blocked method*/
+    @Override
+    public void notifyEvent(Object event) {
+        Set<EventNode> listeners = eventToListener.get(event);
+        if(listeners!=null){
+            for(EventNode listener : listeners){
+                listener.tell(event);
+            }
+        }
     }
 }
