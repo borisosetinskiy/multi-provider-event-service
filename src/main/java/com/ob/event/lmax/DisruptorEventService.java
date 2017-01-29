@@ -27,6 +27,11 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
+    public void lazyCreate(String name, EventLogicFactory eventLogicFactory, OnEventNode onEventNode, OnFailureEventNode onFailureEventNode) {
+
+    }
+
+    @Override
     public EventAgent<Object, Future> create(Object o) {
         return null;
     }

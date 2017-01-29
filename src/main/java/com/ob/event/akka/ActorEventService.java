@@ -4,6 +4,8 @@ import akka.actor.ActorRef;
 import akka.actor.Props;
 import akka.agent.Agent;
 import akka.dispatch.ExecutionContexts;
+import akka.dispatch.OnFailure;
+import akka.dispatch.OnSuccess;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.ob.common.akka.ActorUtil;
@@ -231,6 +233,23 @@ public class ActorEventService extends WithActorService implements EventService<
 
         eventNodes.put(name, node);
         return node;
+    }
+
+    @Override
+    public void lazyCreate(String name, EventLogicFactory eventLogicFactory, OnEventNode onEventNode, OnFailureEventNode onFailureEventNode) {
+        Future<EventNode> future = execute(() -> create(name, eventLogicFactory));
+        future.onSuccess(new OnSuccess<EventNode>() {
+            @Override
+            public void onSuccess(EventNode result) throws Throwable {
+                onEventNode.onEventNode(result);
+            }
+        }, ec);
+        future.onFailure(new OnFailure() {
+            @Override
+            public void onFailure(Throwable failure) throws Throwable {
+                onFailureEventNode.onFailure(failure);
+            }
+        }, ec);
     }
 
     @Override
