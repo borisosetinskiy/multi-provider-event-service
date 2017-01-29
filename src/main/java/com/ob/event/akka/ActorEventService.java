@@ -238,18 +238,20 @@ public class ActorEventService extends WithActorService implements EventService<
     @Override
     public void lazyCreate(String name, EventLogicFactory eventLogicFactory, OnEventNode onEventNode, OnFailureEventNode onFailureEventNode) {
         Future<EventNode> future = execute(() -> create(name, eventLogicFactory));
-        future.onSuccess(new OnSuccess<EventNode>() {
-            @Override
-            public void onSuccess(EventNode result) throws Throwable {
-                onEventNode.onEventNode(result);
-            }
-        }, ec);
-        future.onFailure(new OnFailure() {
-            @Override
-            public void onFailure(Throwable failure) throws Throwable {
-                onFailureEventNode.onFailure(failure);
-            }
-        }, ec);
+        if(onEventNode!=null)
+            future.onSuccess(new OnSuccess<EventNode>() {
+                @Override
+                public void onSuccess(EventNode result) throws Throwable {
+                    onEventNode.onEventNode(result);
+                }
+            }, ec);
+        if(onFailureEventNode!=null)
+            future.onFailure(new OnFailure() {
+                @Override
+                public void onFailure(Throwable failure) throws Throwable {
+                    onFailureEventNode.onFailure(failure);
+                }
+            }, ec);
     }
 
     @Override
