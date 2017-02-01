@@ -11,58 +11,14 @@ import java.util.concurrent.TimeUnit;
  */
 public class DisruptorEventService implements EventService<Future> {
 
-    @Override
-    public EventAgent getAgent(String agentName) {
-        return null;
-    }
 
     @Override
-    public EventAgent registryAgent(String name, EventAgentScope scope) {
-        return null;
-    }
-
-    @Override
-    public EventNode create(String name, EventLogicFactory eventLogicFactory) {
-        return null;
-    }
-
-    @Override
-    public void lazyCreate(String name, EventLogicFactory eventLogicFactory, OnEventNode onEventNode, OnFailureEventNode onFailureEventNode) {
+    public void start() {
 
     }
 
     @Override
-    public EventAgent<Object, Future> create(Object o) {
-        return null;
-    }
-
-    @Override
-    public <V> Future execute(Callable<V> callable) {
-        return null;
-    }
-
-    @Override
-    public void scheduleEvent(EventNode sender, EventNode recipient, Object event, TimeUnit tu, int time) {
-
-    }
-
-    @Override
-    public void scheduleEvent(EventNode sender, String recipient, Object event, TimeUnit tu, int time) {
-
-    }
-
-    @Override
-    public void tellEvent(EventNode sender, EventNode recipient, Object event) {
-
-    }
-
-    @Override
-    public void tellEvent(EventNode sender, String recipient, Object event) {
-
-    }
-
-    @Override
-    public void publishEvent(Object event) {
+    public void stop() {
 
     }
 
@@ -77,7 +33,77 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
-    public void shutdownNode(EventNode node) {
+    public void publishEvent(Object event) {
+
+    }
+
+    @Override
+    public void addNodeToBatch(EventNode node, Object event) {
+
+    }
+
+    @Override
+    public void removeNodeFromBatch(EventNode node, Object event) {
+
+    }
+
+    @Override
+    public void batch(Object event) {
+
+    }
+
+    @Override
+    public void tellEvent(EventNode sender, EventNode recipient, Object event) {
+
+    }
+
+    @Override
+    public void tellEvent(EventNode sender, String recipient, Object event) {
+
+    }
+
+    @Override
+    public EventAgent create(String name, Object o) {
+        return null;
+    }
+
+    @Override
+    public EventNode create(String name, String group, EventLogicFactory eventLogicFactory) {
+        return null;
+    }
+
+    @Override
+    public void lazyCreate(String name, String group, EventLogicFactory eventLogicFactory, OnEventNode onEventNode, OnFailureEventNode onFailureEventNode) {
+
+    }
+
+    @Override
+    public EventAgent getAgent(String agentName) {
+        return null;
+    }
+
+    @Override
+    public <V> Future execute(Callable<V> callable) {
+        return null;
+    }
+
+    @Override
+    public void scheduledEvent(EventNode sender, EventNode recipient, Object event, TimeUnit tu, int time) {
+
+    }
+
+    @Override
+    public void scheduledEvent(EventNode sender, String recipient, Object event, TimeUnit tu, int time) {
+
+    }
+
+    @Override
+    public void release(EventNode node) {
+
+    }
+
+    @Override
+    public void release(String name) {
 
     }
 
@@ -87,17 +113,17 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
-    public void subscribeEvent(EventNode subscriber, Object event) {
-
+    public EventNodeUnion getUnion(String unionName) {
+        return null;
     }
 
     @Override
-    public void removeEvent(EventNode subscriber, Object event) {
-
+    public EventNodeGroup getGroup(String groupName) {
+        return null;
     }
 
     @Override
-    public void notifyEvent(Object event) {
+    public void addGroup(String groupName, EventNode node) {
 
     }
 }

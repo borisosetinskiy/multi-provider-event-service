@@ -5,8 +5,6 @@ import java.util.EventListener;
 /**
  * Created by boris on 1/29/2017.
  */
-public interface EventNodeListener extends EventListener {
+public interface EventNodeListener extends EventPoint, EventListener {
     void onEvent(Object event);
-    void subscribe(EventNode node);
-    void remove(EventNode node);
 }
