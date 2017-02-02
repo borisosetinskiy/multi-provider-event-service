@@ -121,13 +121,11 @@ public class ActorEventService extends WithActorService implements EventService<
         final String unionName = (unionId == null)? DEFAULT_UNION_ID :unionId;
         EventNode<ActorRef> node = new EventNodeObject<ActorRef, Object>() {
             private Set<EventNode> listeners = Sets.newConcurrentHashSet();
-            Set<String> groups = Sets.newConcurrentHashSet();
+            Set<String> groupNames = Sets.newConcurrentHashSet();
             final EventLogic eventLogic = eventLogicFactory.create();
             final ActorRef actor = actorService.getActorSystem().actorOf((Props) eventLogic.cast(), name);
             {
-                if(eventLogic instanceof OnEventNode){
-                    ((OnEventNode)eventLogic).onEventNode(this);
-                }
+                eventLogic.onEventNode(this);
             }
 
             @Override
@@ -137,7 +135,22 @@ public class ActorEventService extends WithActorService implements EventService<
 
             @Override
             public Set<String> groups() {
-                return groups;
+                return groupNames;
+            }
+
+            @Override
+            public void addGroup(String groupName) {
+                ActorEventService.this.addGroup(groupName, this);
+            }
+
+            @Override
+            public void removeGroup(String groupName) {
+                ActorEventService.this.removeGroup(groupName, this);
+            }
+
+            @Override
+            public EventNodeGroup getGroup(String groupName) {
+                return ActorEventService.this.getGroup(groupName);
             }
 
             @Override
@@ -185,7 +198,10 @@ public class ActorEventService extends WithActorService implements EventService<
             public void release() {
                 try{
                     listeners.clear();
-                    groups.clear();
+                    for(String groupName : groupNames){
+                        removeGroup(groupName);
+                    }
+                    groupNames.clear();
                     unions.remove(name);
                     eventNodes.remove(name);
                     removeNodeFromAllBatch(this);
@@ -386,6 +402,13 @@ public class ActorEventService extends WithActorService implements EventService<
             }
         }
         eventGroup.add(node);
+        node.groups().add(groupName);
+    }
+
+    @Override
+    public void removeGroup(String groupName, EventNode node) {
+        EventNodeGroup eventGroup = getGroup(groupName);
+        eventGroup.remove(node);
     }
 
     private ActorRef sender(EventNode<ActorRef> sender){

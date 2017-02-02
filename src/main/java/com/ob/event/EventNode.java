@@ -5,11 +5,9 @@ import java.util.Set;
 /**
  * Created by boris on 1/29/2017.
  */
-public interface EventNode<T> extends EventNodeListener, EventNodeEndPoint, Wrapper<T>, Releasable{
+public interface EventNode<T> extends EventNodeListener, EventGroupMember, EventNodeEndPoint, Wrapper<T>, Releasable{
     String union();
-    Set<String> groups();
     boolean isActive();
-
     EventNode EMPTY = new EventNode() {
         @Override
         public String union() {
@@ -19,6 +17,21 @@ public interface EventNode<T> extends EventNodeListener, EventNodeEndPoint, Wrap
         @Override
         public Set<String> groups() {
             return null;
+        }
+
+        @Override
+        public void addGroup(String groupName) {
+
+        }
+
+        @Override
+        public void removeGroup(String groupName) {
+
+        }
+
+        @Override
+        public EventNodeGroup getGroup(String groupName) {
+            return EventNodeGroup.EMPTY;
         }
 
         @Override

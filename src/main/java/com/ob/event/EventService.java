@@ -11,5 +11,6 @@ public interface EventService<F> extends EventNodeFactory, EventNodeScheduledSer
     EventNodeUnion getUnion(String unionName);
     EventNodeGroup getGroup(String groupName);
     void addGroup(String groupName, EventNode node);
+    void removeGroup(String groupName, EventNode node);
 }
 

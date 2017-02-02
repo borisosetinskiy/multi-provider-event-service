@@ -126,4 +126,9 @@ public class DisruptorEventService implements EventService<Future> {
     public void addGroup(String groupName, EventNode node) {
 
     }
+
+    @Override
+    public void removeGroup(String groupName, EventNode node) {
+
+    }
 }

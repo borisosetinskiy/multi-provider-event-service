@@ -1,21 +1,27 @@
 package com.ob.event.akka;
 
 import akka.actor.Props;
-import com.ob.event.EventLogic;
-import com.ob.event.EventNode;
-import com.ob.event.EventNodeObject;
-import com.ob.event.OnEventNode;
+import com.ob.event.*;
 
 /**
  * Created by boris on 1/30/2017.
  */
-public abstract class AkkaEventLogic implements EventLogic<Props>, OnEventNode {
+public abstract class AkkaEventLogic implements EventLogic<Props> {
     private String name;
     private EventNode eventNode;
     private Props props;
-    public AkkaEventLogic(String name) {
+
+    protected AkkaEventLogic(String name) {
+        this(name, null, null);
+    }
+
+    protected AkkaEventLogic(String name, String withDispatcher, String withMailbox) {
         this.name = name;
         props = AkkaActor.props(this);
+        if(withDispatcher!=null)
+            props = props.withDispatcher(withDispatcher);
+        if(withMailbox!=null)
+            props = props.withMailbox(withMailbox);
     }
 
     @Override
@@ -41,6 +47,10 @@ public abstract class AkkaEventLogic implements EventLogic<Props>, OnEventNode {
 
     protected EventNodeObject getEventNodeObject(){
         return (EventNodeObject)eventNode;
+    }
+
+    protected EventService getService(){
+        return getEventNodeObject().getEventService();
     }
 
     @Override
