@@ -10,7 +10,6 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
     private String name;
     private EventNode eventNode;
     private Props props;
-
     protected AkkaEventLogic(String name) {
         this(name, null, null);
     }
@@ -32,12 +31,6 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
     @Override
     public Props cast() {
         return props;
-    }
-
-    @Override
-    public void onEvent(Object event){
-        if(eventNode != null)
-            eventNode.onEvent(event);
     }
 
     @Override

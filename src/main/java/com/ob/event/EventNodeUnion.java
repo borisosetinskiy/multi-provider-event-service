@@ -5,9 +5,18 @@ import java.util.Collection;
 /**
  * Created by boris on 1/31/2017.
  */
-public interface EventNodeUnion extends Group<EventNode>, EventNodeEndPoint, Releasable{
+public interface EventNodeUnion extends  EventNodeEndPoint, Releasable{
     EventNode get(String name);
+    void add(EventNode value);
+    void remove(EventNode value);
+    Collection<EventNode> all();
+    boolean isEmpty();
     EventNodeUnion EMPTY = new EventNodeUnion(){
+        @Override
+        public void tell(Object event, EventNode sender) {
+
+        }
+
         @Override
         public EventNode get(String name) {
             return null;
@@ -33,10 +42,7 @@ public interface EventNodeUnion extends Group<EventNode>, EventNodeEndPoint, Rel
             return true;
         }
 
-        @Override
-        public void tell(Object event) {
 
-        }
 
         @Override
         public String name() {

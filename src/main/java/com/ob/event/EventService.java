@@ -3,14 +3,11 @@ package com.ob.event;
 /**
  * Created by boris on 1/28/2017.
  */
-public interface EventService<F> extends EventNodeFactory, EventNodeScheduledService
-        , EventAgentService, ExecutableContext<F>, EventStream, EventNodeBatch, EventEndPointService, Service {
-    void release(EventNode node);
+public interface EventService<F, T, L> extends EventNodeFactory, EventNodeScheduledService
+        , EventAgentService, ExecutableContext<F>, EventStream<T>, EventLookup<L>, EventEndPointService, Service {
     void release(String name);
     EventNode getEventNode(String name);
     EventNodeUnion getUnion(String unionName);
-    EventNodeGroup getGroup(String groupName);
-    void addGroup(String groupName, EventNode node);
-    void removeGroup(String groupName, EventNode node);
+    EventNodeGroupService getEventNodeGroupService();
 }
 

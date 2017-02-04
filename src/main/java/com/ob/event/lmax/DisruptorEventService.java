@@ -9,8 +9,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Created by boris on 1/28/2017.
  */
-public class DisruptorEventService implements EventService<Future> {
-
+public class DisruptorEventService implements EventService<Future, Object, Object> {
 
     @Override
     public void start() {
@@ -23,32 +22,32 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
-    public void subscribeEventStream(EventNode subscriber, Object event) {
+    public void subscribeLookup(EventNode subscriber, Object topic) {
 
     }
 
     @Override
-    public void removeEventStream(EventNode subscriber, Object event) {
+    public void removeLookup(EventNode subscriber, Object topic) {
 
     }
 
     @Override
-    public void publishEvent(Object event) {
+    public void publishEvent(EventEnvelope<Object> event) {
 
     }
 
     @Override
-    public void addNodeToBatch(EventNode node, Object event) {
+    public void subscribeStream(EventNode subscriber, Object topic) {
 
     }
 
     @Override
-    public void removeNodeFromBatch(EventNode node, Object event) {
+    public void removeStream(EventNode subscriber, Object topic) {
 
     }
 
     @Override
-    public void batch(Object event) {
+    public void publishStream(Object event) {
 
     }
 
@@ -63,7 +62,7 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
-    public EventAgent create(String name, Object o) {
+    public EventAgent create(String agentName, Object o) {
         return null;
     }
 
@@ -98,11 +97,6 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
-    public void release(EventNode node) {
-
-    }
-
-    @Override
     public void release(String name) {
 
     }
@@ -118,17 +112,7 @@ public class DisruptorEventService implements EventService<Future> {
     }
 
     @Override
-    public EventNodeGroup getGroup(String groupName) {
+    public EventNodeGroupService getEventNodeGroupService() {
         return null;
-    }
-
-    @Override
-    public void addGroup(String groupName, EventNode node) {
-
-    }
-
-    @Override
-    public void removeGroup(String groupName, EventNode node) {
-
     }
 }

@@ -1,16 +1,15 @@
 package com.ob.event;
 
-import java.util.Collection;
-
 /**
- * Created by boris on 1/31/2017.
+ * Created by boris on 2/4/2017.
  */
-public interface EventNodeGroup extends Group<EventNode>, EventNodeEndPoint, Releasable{
-    EventNodeGroup EMPTY = new EventNodeGroup() {
-        @Override
-        public void tell(Object event) {
-
-        }
+public interface EventNodeGroup extends EventPoint{
+    void add(EventNode node);
+    void remove(EventNode node);
+    EventNode find(String eventNodeName);
+    boolean isEmpty();
+    void clear();
+    EventNodeGroup EMPTY = new EventNodeGroup(){
 
         @Override
         public String name() {
@@ -18,17 +17,17 @@ public interface EventNodeGroup extends Group<EventNode>, EventNodeEndPoint, Rel
         }
 
         @Override
-        public void add(EventNode value) {
+        public void add(EventNode node) {
 
         }
 
         @Override
-        public void remove(EventNode value) {
+        public void remove(EventNode node) {
 
         }
 
         @Override
-        public Collection<EventNode> all() {
+        public EventNode find(String eventNodeName) {
             return null;
         }
 
@@ -38,8 +37,9 @@ public interface EventNodeGroup extends Group<EventNode>, EventNodeEndPoint, Rel
         }
 
         @Override
-        public void release() {
+        public void clear() {
 
         }
+
     };
 }
