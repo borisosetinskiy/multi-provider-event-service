@@ -115,83 +115,6 @@ public class ActorEventService extends WithActorService implements EventService<
     @Override
     public EventNode create(final String name, String unionId, final EventLogicFactory eventLogicFactory) {
         final String unionName = (unionId == null)? DEFAULT_UNION_ID :unionId;
-        EventNode<ActorRef> node = new EventNodeObject<ActorRef, Object>() {
-            final ObjectOpenHashSet topics = new ObjectOpenHashSet();
-            final EventLogic eventLogic = eventLogicFactory.create();
-            final ActorRef actor = actorService.getActorSystem().actorOf((Props) eventLogic.cast(), name);
-            {
-                eventLogic.onEventNode(this);
-            }
-
-            @Override
-            public String union() {
-                return unionName;
-            }
-
-
-            @Override
-            public boolean isActive() {
-                return !actor.isTerminated();
-            }
-
-
-            @Override
-            public String name() {
-                return name;
-            }
-
-            /*Unblocked method*/
-            @Override
-            public void scheduledEvent(final Object event, final TimeUnit tu, final int time) {
-                scheduledEvent0(actor, actor, event, tu, time);
-            }
-
-            @Override
-            public ActorRef unwrap() {
-                return actor;
-            }
-
-            @Override
-            public Object getEventLogic() {
-                return eventLogic;
-            }
-
-            @Override
-            public EventService getEventService() {
-                return ActorEventService.this;
-            }
-
-            @Override
-            public ObjectOpenHashSet topics() {
-                return topics;
-            }
-
-            @Override
-            public void release() {
-                try{
-                    topics.clear();
-                    unions.remove(name);
-                    eventNodes.remove(name);
-                }catch (Exception e){}finally{
-                    try {
-                        ActorUtil.gracefulReadyStop(actor);
-                    }catch (Exception e0){}
-                }
-            }
-
-            /*Unblocked method*/
-            @Override
-            public void tell(Object event, EventNode sender) {
-                tellEvent(sender, this, event);
-            }
-
-
-
-            @Override
-            public int hashCode() {
-                return name.hashCode();
-            }
-        };
 
         EventNodeUnion eventUnion = unions.get(unionName);
         if(eventUnion == null){
@@ -255,6 +178,111 @@ public class ActorEventService extends WithActorService implements EventService<
                 unionLock.unlock();
             }
         }
+
+        final EventNode<ActorRef> node = new EventNodeObject<ActorRef, Object>() {
+            final ObjectOpenHashSet topics = new ObjectOpenHashSet();
+            final EventLogic eventLogic = eventLogicFactory.create();
+            private ActorRef actor;
+            Lock actorLock = new ReentrantLock();
+            {
+                eventLogic.onEventNode(this);
+                actor();
+
+            }
+
+            ActorRef actor(){
+                if(actor == null){
+                    actorLock.lock();
+                    try{
+                        if(actor == null){
+                            actor = actorService.getActorSystem().actorOf((Props) eventLogic.cast(), name);
+                        }
+                    }finally {
+                        actorLock.unlock();
+                    }
+                }
+                return actor;
+            }
+
+            @Override
+            public String union() {
+                return unionName;
+            }
+
+
+            @Override
+            public boolean isActive() {
+                return !actor().isTerminated();
+            }
+
+
+            @Override
+            public String name() {
+                return name;
+            }
+
+            /*Unblocked method*/
+            @Override
+            public void scheduledEvent(final Object event, final TimeUnit tu, final int time) {
+                scheduledEvent0(actor(), actor(), event, tu, time);
+            }
+
+            @Override
+            public ActorRef unwrap() {
+
+                return actor();
+            }
+
+            @Override
+            public Object getEventLogic() {
+                return eventLogic;
+            }
+
+            @Override
+            public EventService getEventService() {
+                return ActorEventService.this;
+            }
+
+            @Override
+            public ObjectOpenHashSet topics() {
+                return topics;
+            }
+
+            @Override
+            public void release() {
+                try{
+                    topics.clear();
+                    unions.remove(name);
+                    eventNodes.remove(name);
+                    eventNodeGroupService.removeGroups(name);
+                }catch (Exception e){}finally{
+                    try {
+                        ActorUtil.gracefulReadyStop(actor);
+                    }catch (Exception e0){}
+                }
+            }
+
+            /*Unblocked method*/
+            @Override
+            public void tell(Object event, EventNode sender) {
+                tellEvent(sender, this, event);
+            }
+
+
+
+            @Override
+            public int hashCode() {
+                return name.hashCode();
+            }
+
+            @Override
+            public String toString() {
+                return "EventNode{" +
+                        "EventLogic=" + eventLogic +
+                        ", Actor=" + actor +
+                        '}';
+            }
+        };
         eventUnion.add(node);
         eventNodes.put(node.name(), node);
         return node;

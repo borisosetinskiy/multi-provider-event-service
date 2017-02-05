@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by boris on 2/4/2017.
@@ -14,39 +16,60 @@ import java.util.Set;
 public class EventNodeGroupServiceImpl implements EventNodeGroupService {
     private Map<String, EventNodeGroup> nodeGroups = Maps.newConcurrentMap();
     private Map<String, Set<String>> nodeToGroup = Maps.newConcurrentMap();
+    private Lock lock = new ReentrantLock();
     @Override
     public EventNodeGroup addGroup(String groupName, EventNode node) {
-        final EventNodeGroup nodeGroup = nodeGroups.getOrDefault(groupName, new EventNodeGroup() {
-            private Map<String, EventNode> nodes = Maps.newConcurrentMap();
-            @Override
-            public String name() {
-                return groupName;
-            }
-            @Override
-            public void add(EventNode node) {
-                nodes.put(node.name(), node);
-            }
+        EventNodeGroup nodeGroup = nodeGroups.get(groupName);
+        if(nodeGroup == null){
+            lock.lock();
+            try{
+                if(nodeGroup == null){
+                    nodeGroup = new EventNodeGroup() {
+                        private Map<String, EventNode> nodes = Maps.newConcurrentMap();
+                        @Override
+                        public String name() {
+                            return groupName;
+                        }
+                        @Override
+                        public void add(EventNode node) {
+                            nodes.put(node.name(), node);
+                        }
 
-            @Override
-            public void remove(EventNode node) {
-                nodes.remove(node);
-            }
+                        @Override
+                        public void remove(EventNode node) {
+                            removeByName(node.name());
+                        }
 
-            @Override
-            public EventNode find(String eventNodeName) {
-                return nodes.get(eventNodeName);
-            }
+                        @Override
+                        public void removeByName(String eventNodeName) {
+                            nodes.remove(eventNodeName);
+                        }
 
-            @Override
-            public boolean isEmpty() {
-                return nodes.isEmpty();
-            }
+                        @Override
+                        public EventNode find(String eventNodeName) {
+                            return nodes.get(eventNodeName);
+                        }
 
-            @Override
-            public void clear() {
-                nodes.clear();
+                        @Override
+                        public Collection<EventNode> all() {
+                            return nodes.values();
+                        }
+
+                        @Override
+                        public boolean isEmpty() {
+                            return nodes.isEmpty();
+                        }
+
+                        @Override
+                        public void clear() {
+                            nodes.clear();
+                        }
+                    };
+                }
+            }finally {
+                lock.unlock();
             }
-        });
+        }
         nodeGroup.add(node);
         final Set<String> groupNames = nodeToGroup.getOrDefault(nodeGroup.name(), Sets.newHashSet());
         groupNames.add(groupName);
@@ -61,7 +84,11 @@ public class EventNodeGroupServiceImpl implements EventNodeGroupService {
 
     @Override
     public void removeGroups(String eventNodeName) {
-        nodeToGroup.getOrDefault(eventNodeName, Collections.EMPTY_SET);
+        Set<String> groups = nodeToGroup.getOrDefault(eventNodeName, Collections.EMPTY_SET);
+        for(String groupName : groups){
+            EventNodeGroup group = findGroup(groupName);
+            group.removeByName(eventNodeName);
+        }
     }
 
     @Override

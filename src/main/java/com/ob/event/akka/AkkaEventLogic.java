@@ -48,6 +48,6 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
 
     @Override
     public String toString() {
-        return "{name:'" + name + "\'}";
+        return "AkkaEventLogic{name='" + name + "\'}";
     }
 }

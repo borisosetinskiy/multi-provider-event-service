@@ -55,6 +55,34 @@ class Test1{
             });
         }
 
+        for(int i=0;i<10;++i){
+            final String name =  "CI" + i;
+            actorEventService.create(name, "Consumer2", new EventLogicFactory() {
+                @Override
+                public EventLogic create() {
+                    return new AkkaEventLogic(name) {
+                        @Override
+                        public void onEvent(Object event, EventNodeEndPoint sender) {
+                            System.out.println(name+event);
+
+                        }
+
+                        @Override
+                        public void start() {
+                            this.getEventNodeObject().getEventService().subscribeLookup(getEventNodeObject(), "ToConsumer2");
+                            System.out.println("Start-"+name);
+                        }
+
+                        @Override
+                        public void stop() {
+                            System.out.println("Stop-"+name);
+                        }
+
+                    };
+                }
+            });
+        }
+
         for(int i=0;i<1;++i){
             final String name =  "P" + i;
             actorEventService.create(name, "Producer", new EventLogicFactory() {
