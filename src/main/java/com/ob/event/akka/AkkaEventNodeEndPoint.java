@@ -1,5 +1,6 @@
 package com.ob.event.akka;
 
+import akka.actor.ActorRef;
 import com.ob.event.EventNode;
 import com.ob.event.EventNodeEndPoint;
 
@@ -16,11 +17,14 @@ public class AkkaEventNodeEndPoint implements EventNodeEndPoint {
 
     @Override
     public String name() {
-        return akkaActor.getSender().path().name();
+        return akkaActor.getSelf().path().name();
     }
 
     @Override
     public void tell(Object event, EventNode sender) {
-        akkaActor.getSender().tell(event, akkaActor.self());
+        if(sender != null)
+            akkaActor.getSelf().tell(event, (ActorRef)sender.unwrap());
+        else
+            akkaActor.getSelf().tell(event, akkaActor.self());
     }
 }

@@ -50,4 +50,9 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
     public String toString() {
         return "AkkaEventLogic{name='" + name + "\'}";
     }
+
+    @Override
+    public void release(){
+        getEventNodeObject().release();
+    }
 }

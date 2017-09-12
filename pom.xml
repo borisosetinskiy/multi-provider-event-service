@@ -4,7 +4,7 @@
 
   <groupId>com.ob</groupId>
   <artifactId>multi-provider-event-service</artifactId>
-  <version>1.0.8</version>
+  <version>1.0.12</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -66,6 +66,11 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-context</artifactId>
       <version>4.3.5.RELEASE</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.21</version>
     </dependency>
   </dependencies>
 </project>

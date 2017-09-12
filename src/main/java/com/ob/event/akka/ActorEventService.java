@@ -6,11 +6,15 @@ import akka.agent.Agent;
 import akka.dispatch.ExecutionContexts;
 import akka.dispatch.OnFailure;
 import akka.dispatch.OnSuccess;
+import akka.routing.Router;
+import akka.routing.RoutingLogic;
 import com.google.common.collect.Maps;
 import com.ob.common.akka.ActorUtil;
 import com.ob.common.akka.WithActorService;
 import com.ob.event.*;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
@@ -19,9 +23,12 @@ import scala.concurrent.duration.FiniteDuration;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import static akka.dispatch.Futures.future;
 
@@ -30,18 +37,31 @@ import static akka.dispatch.Futures.future;
  * Created by boris on 1/28/2017.
  */
 public class ActorEventService extends WithActorService implements EventService< Future, Class, Object> {
-    private ExecutionContext ec = ExecutionContexts.global();
+    private Logger logger = LoggerFactory.getLogger(ActorEventService.class);
+    private ExecutionContext futureExecutionContext = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(64, r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+    }));
+    private ExecutionContext agentExecutionContext = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(64, r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+    }));
     private Map<String, EventAgent<Object, Future>> agents = Maps.newConcurrentMap();
     private Map<String, EventNodeUnion> unions = Maps.newConcurrentMap();
     private Map<String, EventNode> eventNodes = Maps.newConcurrentMap();
     private Lock agentLock = new ReentrantLock();
     private Lock unionLock = new ReentrantLock();
     private static final String DEFAULT_UNION_ID = "z";
+//    private static final String ROUTER_PREF = "ROUTER_";
     private AkkaLookup akkaLookup = new AkkaLookup();
     private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
+    private AkkaEventRetryService akkaEventRetryService;
 
     public ActorEventService() {
-
+        akkaEventRetryService = new AkkaEventRetryService();
+        create(akkaEventRetryService.name(), akkaEventRetryService.name(), () -> akkaEventRetryService);
     }
 
     /*Unblocked method*/
@@ -109,7 +129,7 @@ public class ActorEventService extends WithActorService implements EventService<
     /*Unblocked method*/
     @Override
     public <V> Future<V> execute(Callable<V> callable) {
-        return future(callable, ec);
+        return future(callable, futureExecutionContext);
     }
 
     @Override
@@ -248,6 +268,7 @@ public class ActorEventService extends WithActorService implements EventService<
                 return topics;
             }
 
+
             @Override
             public void release() {
                 try{
@@ -298,14 +319,14 @@ public class ActorEventService extends WithActorService implements EventService<
                 public void onSuccess(EventNode result) throws Throwable {
                     onEventNode.onEventNode(result);
                 }
-            }, ec);
+            }, futureExecutionContext);
         if(onFailureEventNode!=null)
             future.onFailure(new OnFailure() {
                 @Override
                 public void onFailure(Throwable failure) throws Throwable {
                     onFailureEventNode.onFailure(failure);
                 }
-            }, ec);
+            }, futureExecutionContext);
     }
 
 
@@ -329,6 +350,11 @@ public class ActorEventService extends WithActorService implements EventService<
         return eventNodeGroupService;
     }
 
+    @Override
+    public EventRetryService getEventRetryService() {
+        return akkaEventRetryService;
+    }
+
     private ActorRef sender(EventNode<ActorRef> sender){
         return (sender==null)?ActorRef.noSender():sender.unwrap();
     }
@@ -346,7 +372,7 @@ public class ActorEventService extends WithActorService implements EventService<
                         return name;
                     }
 
-                    final Agent agent = Agent.create(o, ec);
+                    final Agent agent = Agent.create(o, agentExecutionContext);
                     @Override
                     public void put(Object object) {
                         agent.send(object);
@@ -403,5 +429,109 @@ public class ActorEventService extends WithActorService implements EventService<
     @Override
     public void publishEvent(EventEnvelope<Object> event) {
         akkaLookup.publish(event);
+    }
+
+    @Override
+    public EventNodeRouter create(String name, RouterLogicFactory routerLogicFactory) {
+        return new EventNodeRouter(){
+            protected Router router;
+            private Map<String, EventNode> nodes = Maps.newConcurrentMap();
+            {
+                router = new Router((RoutingLogic) routerLogicFactory.create().unwrap());
+            }
+            @Override
+            public Collection<EventNode> getNodes() {
+                return nodes.values();
+            }
+
+            @Override
+            public void addNode(EventNode node) {
+                router.addRoutee((ActorRef) node.unwrap());
+                nodes.put(node.name(), node);
+            }
+
+            @Override
+            public void removeNode(EventNode node) {
+                router.removeRoutee((ActorRef) node.unwrap());
+                nodes.remove(node.name());
+            }
+            @Override
+            public void tell(Object event, EventNode sender) {
+                router.route(event, (ActorRef) sender.unwrap());
+            }
+
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public void release() {
+                nodes.values().forEach(node -> {
+                    removeNode(node);
+                    node.release();
+                });
+            }
+        };
+    }
+
+
+    class AkkaEventRetryService extends AkkaEventLogic implements EventRetryService {
+
+        private AtomicLong generator = new AtomicLong();
+        private Map<Object, EventRetry> eventRetries = Maps.newConcurrentMap();
+
+        protected AkkaEventRetryService() {
+            super("EVENT_RETRY");
+        }
+
+
+        @Override
+        public void tellEvent( EventNode recipient, Object event, Object id, EventRetryOption eventRetryOption, Consumer consumer) {
+            Object newId = (id!=null)?id:generator.incrementAndGet();
+            EventRetry eventRetry = new EventRetry(newId,  recipient, event, eventRetryOption,  ((Consumer) o -> {
+                try {
+                    eventRetries.remove(newId);
+                } catch (Exception e) {
+                }
+            }).andThen(consumer));
+            eventRetries.put(eventRetry.getId(), eventRetry);
+            send(eventRetry);
+        }
+
+        void send(EventRetry eventRetry){
+            ActorEventService.this.tellEvent(this.getEventNodeObject(),  eventRetry.getRecipient(),  eventRetry.getEventCallback());
+            logger.debug(String.format("Sent %s", eventRetry));
+        }
+
+        @Override
+        public void start() {
+            logger.info("Retry service started...");
+        }
+
+        @Override
+        public void stop() {
+            logger.info("Retry service stopped...");
+        }
+
+        @Override
+        public void onEvent(Object event, EventNodeEndPoint sender) {
+            for(EventRetry eventRetry : eventRetries.values()){
+                try{
+                    if(eventRetry.isMaxAttempt()) {
+                        logger.debug(String.format("Max attempt %s is reached for message %s ", eventRetry.getMaxAttempt(), toString()));
+                        try {
+                            eventRetries.remove(eventRetry.getId());
+                        } catch (Exception e) {
+                        }
+                    }else if(eventRetry.isTimeout()){
+                        ActorEventService.this.execute(() -> {
+                            send(eventRetry.retry());
+                            return null;
+                        });
+                    }
+                }catch(Exception e){}
+            }
+        }
     }
 }

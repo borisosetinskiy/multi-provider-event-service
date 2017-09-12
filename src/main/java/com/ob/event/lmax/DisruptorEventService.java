@@ -115,4 +115,15 @@ public class DisruptorEventService implements EventService<Future, Object, Objec
     public EventNodeGroupService getEventNodeGroupService() {
         return null;
     }
+
+    @Override
+    public EventRetryService getEventRetryService() {
+        return null;
+    }
+
+
+    @Override
+    public EventNodeRouter create(String name, RouterLogicFactory routerLogicFactory) {
+        return null;
+    }
 }
