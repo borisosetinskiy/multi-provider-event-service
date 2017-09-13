@@ -1,11 +1,14 @@
 package com.ob.event;
 
 public class EventRetryOption {
-    private final long timeout;
-    private final int maxAttempt;
+    private long timeout = 1000;
+    private int maxAttempt = -1;
 
-    public EventRetryOption(long timeout, int maxAttempt) {
+    public void setTimeout(long timeout) {
         this.timeout = timeout;
+    }
+
+    public void setMaxAttempt(int maxAttempt) {
         this.maxAttempt = maxAttempt;
     }
 

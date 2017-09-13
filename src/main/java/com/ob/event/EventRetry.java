@@ -55,6 +55,8 @@ public class EventRetry<T> {
     }
 
     public boolean isMaxAttempt() {
+        if(eventRetryOption.getMaxAttempt()==-1)
+            return false;
         return eventRetryOption.getMaxAttempt()>=attempt;
     }
 
@@ -77,4 +79,6 @@ public class EventRetry<T> {
                 ", " + previousId +
                 '}';
     }
+
+
 }

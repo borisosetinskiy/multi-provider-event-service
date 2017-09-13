@@ -10,6 +10,7 @@ import akka.routing.Router;
 import akka.routing.RoutingLogic;
 import com.google.common.collect.Maps;
 import com.ob.common.akka.ActorUtil;
+import com.ob.common.akka.TFactory;
 import com.ob.common.akka.WithActorService;
 import com.ob.event.*;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -20,6 +21,7 @@ import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 import scala.concurrent.duration.FiniteDuration;
 
+import javax.annotation.PostConstruct;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -38,30 +40,21 @@ import static akka.dispatch.Futures.future;
  */
 public class ActorEventService extends WithActorService implements EventService< Future, Class, Object> {
     private Logger logger = LoggerFactory.getLogger(ActorEventService.class);
-    private ExecutionContext futureExecutionContext = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(64, r -> {
-        Thread t = new Thread(r);
-        t.setDaemon(true);
-        return t;
-    }));
-    private ExecutionContext agentExecutionContext = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(64, r -> {
-        Thread t = new Thread(r);
-        t.setDaemon(true);
-        return t;
-    }));
+    private ExecutionContext futureExecutionContext = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()*8, new TFactory()));
+    private ExecutionContext agentExecutionContext = ExecutionContexts.fromExecutor(Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors()*4, new TFactory()));
     private Map<String, EventAgent<Object, Future>> agents = Maps.newConcurrentMap();
     private Map<String, EventNodeUnion> unions = Maps.newConcurrentMap();
     private Map<String, EventNode> eventNodes = Maps.newConcurrentMap();
     private Lock agentLock = new ReentrantLock();
     private Lock unionLock = new ReentrantLock();
-    private static final String DEFAULT_UNION_ID = "z";
+    private static final String DEFAULT_UNION_ID = "z"+System.currentTimeMillis();
 //    private static final String ROUTER_PREF = "ROUTER_";
     private AkkaLookup akkaLookup = new AkkaLookup();
     private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
     private AkkaEventRetryService akkaEventRetryService;
 
     public ActorEventService() {
-        akkaEventRetryService = new AkkaEventRetryService();
-        create(akkaEventRetryService.name(), akkaEventRetryService.name(), () -> akkaEventRetryService);
+      //DON'T DO HERE
     }
 
     /*Unblocked method*/
@@ -405,8 +398,10 @@ public class ActorEventService extends WithActorService implements EventService<
 
 
     @Override
+    @PostConstruct
     public void start() {
-       //Nothing
+        akkaEventRetryService = new AkkaEventRetryService();
+        create(akkaEventRetryService.name(), akkaEventRetryService.name(), () -> akkaEventRetryService);
     }
 
     @Override
@@ -475,6 +470,33 @@ public class ActorEventService extends WithActorService implements EventService<
         };
     }
 
+//    class Monitoring extends AkkaEventLogic{
+//        private Logger logger = LoggerFactory.getLogger(Monitoring.class);
+//        protected Monitoring() {
+//            super("MONITORING");
+//        }
+//
+//        @Override
+//        public void start() {
+//            ActorEventService.this.scheduledEvent(getEventNodeObject(), getEventNodeObject(), MONITOR.i, TimeUnit.SECONDS, 30);
+//        }
+//
+//        @Override
+//        public void stop() {
+//
+//        }
+//
+//        @Override
+//        public void onEvent(Object event, EventNodeEndPoint sender) {
+//            if(event instanceof MONITOR){
+//
+//            }
+//        }
+//
+//    }
+//    static final class MONITOR{
+//        static final MONITOR i = new MONITOR();
+//    }
 
     class AkkaEventRetryService extends AkkaEventLogic implements EventRetryService {
 
@@ -507,6 +529,7 @@ public class ActorEventService extends WithActorService implements EventService<
         @Override
         public void start() {
             logger.info("Retry service started...");
+            ActorEventService.this.scheduledEvent(getEventNodeObject(), getEventNodeObject(), RETRY.i, TimeUnit.MILLISECONDS, 500);
         }
 
         @Override
@@ -516,22 +539,30 @@ public class ActorEventService extends WithActorService implements EventService<
 
         @Override
         public void onEvent(Object event, EventNodeEndPoint sender) {
-            for(EventRetry eventRetry : eventRetries.values()){
-                try{
-                    if(eventRetry.isMaxAttempt()) {
-                        logger.debug(String.format("Max attempt %s is reached for message %s ", eventRetry.getMaxAttempt(), toString()));
+            if(event instanceof RETRY){
+                try {
+                    for (EventRetry eventRetry : eventRetries.values()) {
                         try {
-                            eventRetries.remove(eventRetry.getId());
+                            if (eventRetry.isMaxAttempt()) {
+                                logger.debug(String.format("Max attempt %s is reached for message %s ", eventRetry.getMaxAttempt(), toString()));
+                                try {
+                                    eventRetries.remove(eventRetry.getId());
+                                } catch (Exception e) {
+                                }
+                            } else if (eventRetry.isTimeout()) {
+                                ActorEventService.this.execute(() -> {
+                                    send(eventRetry.retry());
+                                    return null;
+                                });
+                            }
                         } catch (Exception e) {
                         }
-                    }else if(eventRetry.isTimeout()){
-                        ActorEventService.this.execute(() -> {
-                            send(eventRetry.retry());
-                            return null;
-                        });
                     }
-                }catch(Exception e){}
+                }catch (Exception e){}
             }
         }
+    }
+    static final class RETRY{
+        final static RETRY i = new RETRY();
     }
 }
