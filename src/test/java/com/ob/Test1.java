@@ -15,15 +15,9 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Created by boris on 1/29/2017.
  */
-public class Example {
+public class Test1 {
     public static void main(String [] args)throws Exception{
-        Test1 test1 = new Test1();
-        test1.test1();
 
-    }
-}
-class Test1{
-    public void test1()throws Exception{
         ActorService actorService = new ActorServiceImpl("Test");
         ActorEventService actorEventService = new ActorEventService();
         actorEventService.setActorService(actorService);
@@ -36,8 +30,14 @@ class Test1{
                         @Override
                         public void onEvent(Object event, EventNodeEndPoint sender) {
                             System.out.println(name+event);
+                        }
+
+                        @Override
+                        public void tellSync(Object event) {
 
                         }
+
+
 
                         @Override
                         public void start() {
@@ -61,6 +61,11 @@ class Test1{
                 @Override
                 public EventLogic create() {
                     return new AkkaEventLogic(name) {
+                        @Override
+                        public void tellSync(Object event) {
+
+                        }
+
                         @Override
                         public void onEvent(Object event, EventNodeEndPoint sender) {
                             System.out.println(name+event);
@@ -90,12 +95,22 @@ class Test1{
                 public EventLogic create() {
                     return new AkkaEventLogic(name) {
                         @Override
+                        public void tellSync(Object event) {
+
+                        }
+
+                        @Override
                         public void onEvent(Object event, EventNodeEndPoint sender) {
                             final long id = counter.incrementAndGet();
                             this.getEventNodeObject().getEventService().publishEvent(new EventEnvelope() {
                                 @Override
                                 public Object topic() {
                                     return "ToConsumer";
+                                }
+
+                                @Override
+                                public int getLookupId() {
+                                    return 0;
                                 }
 
                                 @Override

@@ -7,4 +7,8 @@ public interface EventLookup<T> {
     void subscribeLookup(EventNode subscriber, T topic);
     void removeLookup(EventNode subscriber, T topic);
     void publishEvent(EventEnvelope<T> event);
+
+    void subscribeLookup(int lookupId, EventNode subscriber, T topic);
+    void removeLookup(int lookupId, EventNode subscriber, T topic);
+    void publishEvent(int lookupId, EventEnvelope<T> event);
 }

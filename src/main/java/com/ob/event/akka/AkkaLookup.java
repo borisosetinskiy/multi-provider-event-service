@@ -3,11 +3,12 @@ package com.ob.event.akka;
 import akka.actor.ActorRef;
 import akka.event.japi.LookupEventBus;
 import com.ob.event.EventEnvelope;
+import com.ob.event.ILookup;
 
 /**
  * Created by boris on 2/4/2017.
  */
-public class AkkaLookup<T> extends LookupEventBus<EventEnvelope<T>, ActorRef, T> {
+public class AkkaLookup<T> extends LookupEventBus<EventEnvelope<T>, ActorRef, T> implements ILookup<EventEnvelope<T>, ActorRef, T> {
 
     @Override public T classify(EventEnvelope<T> event) {
         return event.topic();
@@ -22,6 +23,6 @@ public class AkkaLookup<T> extends LookupEventBus<EventEnvelope<T>, ActorRef, T>
     }
 
     @Override public int mapSize() {
-        return 128;
+        return 2048;
     }
 }

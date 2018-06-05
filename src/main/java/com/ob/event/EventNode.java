@@ -7,6 +7,8 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
  */
 public interface EventNode<T> extends EventNodeEndPoint, Wrapper<T>, Releasable{
     String union();
-    boolean isActive();
+//    boolean isActive();
+//    void onStart(T t);
+//    void onStop(T t);
     ObjectOpenHashSet topics();
 }

@@ -19,8 +19,9 @@ public final class ActorUtil {
 	}
 	public static void gracefulReadyStop(final ActorRef actorRef){
 	    try {
-	      Await.ready(gracefulStop(actorRef)
-				  ,FD10);
+	    	if(actorRef!=null)
+			  Await.ready(gracefulStop(actorRef)
+					  ,FD10);
 	      // the actor has been stopped
 	    } catch(Exception e) { }
 	}

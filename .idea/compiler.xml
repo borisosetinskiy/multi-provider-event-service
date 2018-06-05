@@ -9,7 +9,7 @@
         <module name="multi-provider-event-service" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
+    <bytecodeTargetLevel target="1.8">
       <module name="multi-provider-event-service" target="1.8" />
     </bytecodeTargetLevel>
   </component>

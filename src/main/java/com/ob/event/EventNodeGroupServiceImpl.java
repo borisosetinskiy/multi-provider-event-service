@@ -1,12 +1,12 @@
 package com.ob.event;
 
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -14,8 +14,8 @@ import java.util.concurrent.locks.ReentrantLock;
  * Created by boris on 2/4/2017.
  */
 public class EventNodeGroupServiceImpl implements EventNodeGroupService {
-    private Map<String, EventNodeGroup> nodeGroups = Maps.newConcurrentMap();
-    private Map<String, Set<String>> nodeToGroup = Maps.newConcurrentMap();
+    private Map<String, EventNodeGroup> nodeGroups = new ConcurrentHashMap<>();
+    private Map<String, Set<String>> nodeToGroup = new ConcurrentHashMap<>();
     private Lock lock = new ReentrantLock();
     @Override
     public EventNodeGroup addGroup(String groupName, EventNode node) {
@@ -25,7 +25,7 @@ public class EventNodeGroupServiceImpl implements EventNodeGroupService {
             try{
                 if(nodeGroup == null){
                     nodeGroup = new EventNodeGroup() {
-                        private Map<String, EventNode> nodes = Maps.newConcurrentMap();
+                        private Map<String, EventNode> nodes = new ConcurrentHashMap<>();
                         @Override
                         public String name() {
                             return groupName;

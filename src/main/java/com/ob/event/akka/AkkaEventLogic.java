@@ -1,26 +1,25 @@
 package com.ob.event.akka;
 
-import akka.actor.Props;
 import com.ob.event.*;
 
 /**
  * Created by boris on 1/30/2017.
  */
-public abstract class AkkaEventLogic implements EventLogic<Props> {
+public abstract class AkkaEventLogic implements EventLogic {
     private String name;
     private EventNode eventNode;
-    private Props props;
+    private final String withDispatcher;
+    private final String withMailbox;
+
     protected AkkaEventLogic(String name) {
         this(name, null, null);
     }
 
     protected AkkaEventLogic(String name, String withDispatcher, String withMailbox) {
         this.name = name;
-        props = AkkaActor.props(this);
-        if(withDispatcher!=null)
-            props = props.withDispatcher(withDispatcher);
-        if(withMailbox!=null)
-            props = props.withMailbox(withMailbox);
+        this.withMailbox = withMailbox;
+        this.withDispatcher = withDispatcher;
+
     }
 
     @Override
@@ -28,10 +27,6 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
         return name;
     }
 
-    @Override
-    public Props cast() {
-        return props;
-    }
 
     @Override
     public void onEventNode(EventNode eventNode) {
@@ -39,7 +34,7 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
     }
 
     protected EventNodeObject getEventNodeObject(){
-        return (EventNodeObject)eventNode;
+        return eventNode!=null?(EventNodeObject)eventNode:EventNodeObject.EMPTY;
     }
 
     protected EventService getService(){
@@ -48,11 +43,38 @@ public abstract class AkkaEventLogic implements EventLogic<Props> {
 
     @Override
     public String toString() {
-        return "AkkaEventLogic{name='" + name + "\'}";
+        return "{name='" + name + "\'}";
     }
 
     @Override
     public void release(){
         getEventNodeObject().release();
     }
+
+    @Override
+    public void tell(Object event, EventNode sender){
+        getEventNodeObject().tell(event, sender);
+    }
+
+    @Override
+    public void start() {
+
+    }
+
+    @Override
+    public void stop() {
+
+    }
+
+    @Override
+    public String withDispatcher() {
+        return withDispatcher;
+    }
+
+    @Override
+    public String withMailbox() {
+        return withMailbox;
+    }
+
+
 }
