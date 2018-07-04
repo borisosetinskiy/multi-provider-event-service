@@ -23,8 +23,8 @@ public class DisruptorEventService implements EventService<Future, Object, Objec
     }
 
     @Override
-    public void subscribeLookup(EventNode subscriber, Object topic) {
-
+    public boolean subscribeLookup(EventNode subscriber, Object topic) {
+        return true;
     }
 
     @Override
@@ -38,8 +38,8 @@ public class DisruptorEventService implements EventService<Future, Object, Objec
     }
 
     @Override
-    public void subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
-
+    public boolean subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
+        return true;
     }
 
     @Override
@@ -84,10 +84,7 @@ public class DisruptorEventService implements EventService<Future, Object, Objec
         return null;
     }
 
-    @Override
-    public EventNode create(String name, String unionId, EventLogicFactory eventLogicFactory, Consumer onStart) {
-        return null;
-    }
+
 
     @Override
     public void lazyCreate(String name, String unionId, EventLogicFactory eventLogicFactory, Consumer onSuccess, Consumer onFailure) {

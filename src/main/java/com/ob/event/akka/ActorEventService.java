@@ -186,7 +186,7 @@ public class ActorEventService extends WithActorService implements EventService<
     }
 
     EventNodeObject<ActorRef> createEventNodeObject(final String name, String unionName
-            , final EventLogicFactory eventLogicFactory,  Consumer onStart){
+            , final EventLogicFactory eventLogicFactory){
         EventNodeObject<ActorRef> node =  new EventNodeObject<ActorRef>() {
             final ObjectOpenHashSet topics = new ObjectOpenHashSet();
             final EventLogic eventLogic = eventLogicFactory.create();
@@ -291,13 +291,8 @@ public class ActorEventService extends WithActorService implements EventService<
 
     @Override
     public EventNode create(final String name, String unionId, final EventLogicFactory eventLogicFactory) {
-        return create( name,  unionId,  eventLogicFactory, null);
-    }
-
-    @Override
-    public EventNode create(String name, String unionId, EventLogicFactory eventLogicFactory, Consumer onStart) {
         final String unionName = (unionId == null)? DEFAULT_UNION_ID :unionId;
-        final EventNode<ActorRef> node = eventNodes.computeIfAbsent(name, s -> createEventNodeObject(s, unionName, eventLogicFactory, onStart));
+        final EventNode<ActorRef> node = eventNodes.computeIfAbsent(name, s -> createEventNodeObject(s, unionName, eventLogicFactory));
         unions.computeIfAbsent(unionName, s -> createEventNodeUnion(s)).add(node);
         return node;
     }
@@ -367,8 +362,8 @@ public class ActorEventService extends WithActorService implements EventService<
         return hash % 10;
     }
     @Override
-    public void subscribeLookup(EventNode subscriber, Object topic) {
-        subscribeLookup(toLockupId(topic.hashCode()), subscriber,  topic);
+    public boolean subscribeLookup(EventNode subscriber, Object topic) {
+        return subscribeLookup(toLockupId(topic.hashCode()), subscriber,  topic);
     }
 
     @Override
@@ -382,16 +377,26 @@ public class ActorEventService extends WithActorService implements EventService<
     }
 
     @Override
-    public void subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
-        if(akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).subscribe(subscriber.unwrap(), topic)){
-            subscriber.topics().add(topic);
+    public boolean subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
+        if(subscriber!=null) {
+            synchronized (subscriber){
+                if (akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).subscribe(subscriber.unwrap(), topic)) {
+                    subscriber.topics().add(topic);
+                    return true;
+                }
+            }
         }
+        return false;
     }
 
     @Override
     public void removeLookup(int lookupId, EventNode subscriber, Object topic) {
-        if(akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).unsubscribe(subscriber.unwrap(), topic)){
-            subscriber.topics().remove(topic);
+        if(subscriber!=null) {
+            synchronized (subscriber){
+                if(akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).unsubscribe(subscriber.unwrap(), topic)){
+                    subscriber.topics().remove(topic);
+                }
+            }
         }
     }
 
@@ -443,34 +448,6 @@ public class ActorEventService extends WithActorService implements EventService<
             }
         };
     }
-
-//    class Monitoring extends AkkaEventLogic{
-//        private Logger logger = LoggerFactory.getLogger(Monitoring.class);
-//        protected Monitoring() {
-//            super("MONITORING");
-//        }
-//
-//        @Override
-//        public void start() {
-//            ActorEventService.this.scheduledEvent(getEventNodeObject(), getEventNodeObject(), MONITOR.i, TimeUnit.SECONDS, 30);
-//        }
-//
-//        @Override
-//        public void stop() {
-//
-//        }
-//
-//        @Override
-//        public void onEvent(Object event, EventNodeEndPoint sender) {
-//            if(event instanceof MONITOR){
-//
-//            }
-//        }
-//
-//    }
-//    static final class MONITOR{
-//        static final MONITOR i = new MONITOR();
-//    }
 
     static final Consumer EMPTY_CONSUMER = o -> {};
     class AkkaEventTimeoutService extends AkkaEventLogic implements EventTimeoutService {

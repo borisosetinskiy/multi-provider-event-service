@@ -8,7 +8,6 @@ import java.util.function.Consumer;
  */
 public interface EventNodeFactory {
     EventNode create(String name, String unionId, EventLogicFactory eventLogicFactory);
-    EventNode create(String name, String unionId, EventLogicFactory eventLogicFactory, Consumer onStart);
     void lazyCreate (String name, String unionId, EventLogicFactory eventLogicFactory
             , Consumer<EventNode> onSuccess
             , Consumer<Throwable> onFailure);

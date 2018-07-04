@@ -43,7 +43,7 @@ public abstract class AkkaEventLogic implements EventLogic {
 
     @Override
     public String toString() {
-        return "{name='" + name + "\'}";
+        return "{\"" + name + "\"}";
     }
 
     @Override
@@ -76,5 +76,9 @@ public abstract class AkkaEventLogic implements EventLogic {
         return withMailbox;
     }
 
+    @Override
+    public void tellSync(Object event) {
+
+    }
 
 }
