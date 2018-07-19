@@ -554,7 +554,7 @@ public class ActorEventService extends WithActorService implements EventService<
         }
 
         @Override
-        public void onEvent(Object event, EventNodeEndPoint sender) {
+        public void onEvent(Object event, Class clazz) {
 
         }
     }

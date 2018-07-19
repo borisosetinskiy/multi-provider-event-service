@@ -8,12 +8,13 @@ public interface EventLogic extends EventNodeListener, OnEventNode, EventNodeEnd
     void stop();
     String withDispatcher();
     String withMailbox();
+    Class[] getMatchers();
 
     EventLogic EMPTY = new EventLogic(){
 
 
         @Override
-        public void onEvent(Object event, EventNodeEndPoint sender) {
+        public void onEvent(Object event, Class clazz) {
 
         }
 
@@ -61,6 +62,11 @@ public interface EventLogic extends EventNodeListener, OnEventNode, EventNodeEnd
         @Override
         public String withMailbox() {
             return null;
+        }
+
+        @Override
+        public Class[] getMatchers() {
+            return new Class[0];
         }
     };
 }

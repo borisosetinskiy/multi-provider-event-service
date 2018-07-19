@@ -5,7 +5,6 @@ import com.ob.common.akka.ActorServiceImpl;
 import com.ob.event.EventEnvelope;
 import com.ob.event.EventLogic;
 import com.ob.event.EventLogicFactory;
-import com.ob.event.EventNodeEndPoint;
 import com.ob.event.akka.ActorEventService;
 import com.ob.event.akka.AkkaEventLogic;
 
@@ -109,7 +108,7 @@ class Producer extends AkkaEventLogic{
     }
 
     @Override
-    public void onEvent(Object event, EventNodeEndPoint sender) {
+    public void onEvent(Object event, Class clazz) {
         if(event instanceof Produce){
             for(String topic :topics){
                 String value = topic+counter.incrementAndGet();
@@ -168,7 +167,7 @@ class Consumer extends AkkaEventLogic{
     }
 
     @Override
-    public void onEvent(Object event, EventNodeEndPoint sender) {
+    public void onEvent(Object event, Class clazz) {
         if(event instanceof Msg){
             Msg msg =(Msg)event;
             System.out.println(String.format("Consumer %s got msg %s", name(), msg.getValue()));

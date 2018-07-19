@@ -28,7 +28,7 @@ public class Test1 {
                 public EventLogic create() {
                     return new AkkaEventLogic(name) {
                         @Override
-                        public void onEvent(Object event, EventNodeEndPoint sender) {
+                        public void onEvent(Object event, Class clazz) {
                             System.out.println(name+event);
                         }
 
@@ -67,7 +67,7 @@ public class Test1 {
                         }
 
                         @Override
-                        public void onEvent(Object event, EventNodeEndPoint sender) {
+                        public void onEvent(Object event, Class clazz) {
                             System.out.println(name+event);
 
                         }
@@ -100,7 +100,7 @@ public class Test1 {
                         }
 
                         @Override
-                        public void onEvent(Object event, EventNodeEndPoint sender) {
+                        public void onEvent(Object event, Class clazz) {
                             final long id = counter.incrementAndGet();
                             this.getEventNodeObject().getEventService().publishEvent(new EventEnvelope() {
                                 @Override

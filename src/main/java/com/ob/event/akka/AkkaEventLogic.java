@@ -5,7 +5,7 @@ import com.ob.event.*;
 /**
  * Created by boris on 1/30/2017.
  */
-public abstract class AkkaEventLogic implements EventLogic {
+public  abstract class AkkaEventLogic implements EventLogic {
     private String name;
     private EventNode eventNode;
     private final String withDispatcher;
@@ -76,9 +76,19 @@ public abstract class AkkaEventLogic implements EventLogic {
         return withMailbox;
     }
 
+    static final Class[] EMPTY = new Class[0];
+    @Override
+    public Class[] getMatchers() {
+        return EMPTY;
+    }
+
     @Override
     public void tellSync(Object event) {
 
     }
 
+    @Override
+    public void onEvent(Object event, Class clazz) {
+
+    }
 }

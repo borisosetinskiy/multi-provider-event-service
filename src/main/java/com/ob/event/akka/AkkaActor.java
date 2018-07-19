@@ -3,6 +3,7 @@ package com.ob.event.akka;
 import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.japi.Creator;
+import akka.japi.pf.ReceiveBuilder;
 import com.ob.event.EventLogic;
 
 /**
@@ -36,12 +37,22 @@ public class AkkaActor extends AbstractActor {
 
     @Override
     public Receive createReceive() {
-        return receiveBuilder()
-                .matchAny(message -> {
+        final ReceiveBuilder receiveBuilder = receiveBuilder();
+        if(logic.getMatchers().length == 0){
+            receiveBuilder.matchAny(message -> {
+                try {
+                    logic.onEvent(message, null);
+                }catch (Exception e){}
+            });
+        }else{
+            for(Class clazz : logic.getMatchers()){
+                receiveBuilder.match(clazz, message -> {
                     try {
-                        logic.onEvent(message, null);
+                        logic.onEvent(message, clazz);
                     }catch (Exception e){}
-                })
-                .build();
+                });
+            }
+        }
+        return receiveBuilder.build();
     }
 }
