@@ -100,6 +100,11 @@ public class DisruptorEventService implements EventService<Future, Object, Objec
     }
 
     @Override
+    public <V> Future executeSoft(Callable<V> callable) {
+        return null;
+    }
+
+    @Override
     public void scheduledEvent(EventNode sender, EventNode recipient, Object event, TimeUnit tu, int time) {
 
     }

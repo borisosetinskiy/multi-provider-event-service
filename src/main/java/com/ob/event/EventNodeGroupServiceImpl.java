@@ -7,8 +7,6 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Created by boris on 2/4/2017.
@@ -16,64 +14,52 @@ import java.util.concurrent.locks.ReentrantLock;
 public class EventNodeGroupServiceImpl implements EventNodeGroupService {
     private Map<String, EventNodeGroup> nodeGroups = new ConcurrentHashMap<>();
     private Map<String, Set<String>> nodeToGroup = new ConcurrentHashMap<>();
-    private Lock lock = new ReentrantLock();
     @Override
     public EventNodeGroup addGroup(String groupName, EventNode node) {
-        EventNodeGroup nodeGroup = nodeGroups.get(groupName);
-        if(nodeGroup == null){
-            lock.lock();
-            try{
-                if(nodeGroup == null){
-                    nodeGroup = new EventNodeGroup() {
-                        private Map<String, EventNode> nodes = new ConcurrentHashMap<>();
-                        @Override
-                        public String name() {
-                            return groupName;
-                        }
-                        @Override
-                        public void add(EventNode node) {
-                            nodes.put(node.name(), node);
-                        }
-
-                        @Override
-                        public void remove(EventNode node) {
-                            removeByName(node.name());
-                        }
-
-                        @Override
-                        public void removeByName(String eventNodeName) {
-                            nodes.remove(eventNodeName);
-                        }
-
-                        @Override
-                        public EventNode find(String eventNodeName) {
-                            return nodes.get(eventNodeName);
-                        }
-
-                        @Override
-                        public Collection<EventNode> all() {
-                            return nodes.values();
-                        }
-
-                        @Override
-                        public boolean isEmpty() {
-                            return nodes.isEmpty();
-                        }
-
-                        @Override
-                        public void clear() {
-                            nodes.clear();
-                        }
-                    };
-                }
-            }finally {
-                lock.unlock();
+        nodeToGroup.computeIfAbsent(groupName, s -> Sets.newConcurrentHashSet()).add(groupName);
+        EventNodeGroup eventNodeGroup = nodeGroups.computeIfAbsent(groupName, s -> new EventNodeGroup() {
+            private Map<String, EventNode> nodes = new ConcurrentHashMap<>();
+            @Override
+            public String name() {
+                return groupName;
             }
-        }
-        nodeGroup.add(node);
-        final Set<String> groupNames = nodeToGroup.getOrDefault(nodeGroup.name(), Sets.newHashSet());
-        groupNames.add(groupName);
-        return nodeGroups.put(groupName, nodeGroup);
+            @Override
+            public void add(EventNode node1) {
+                nodes.put(node1.name(), node1);
+            }
+
+            @Override
+            public void remove(EventNode node1) {
+                removeByName(node1.name());
+            }
+
+            @Override
+            public void removeByName(String eventNodeName) {
+                nodes.remove(eventNodeName);
+            }
+
+            @Override
+            public EventNode find(String eventNodeName) {
+                return nodes.get(eventNodeName);
+            }
+
+            @Override
+            public Collection<EventNode> all() {
+                return nodes.values();
+            }
+
+            @Override
+            public boolean isEmpty() {
+                return nodes.isEmpty();
+            }
+
+            @Override
+            public void clear() {
+                nodes.clear();
+            }
+        });
+        eventNodeGroup.add(node);
+        return eventNodeGroup;
     }
 
     @Override
@@ -93,7 +79,7 @@ public class EventNodeGroupServiceImpl implements EventNodeGroupService {
 
     @Override
     public Collection<String> findGroupNames(String eventNodeName) {
-        return nodeToGroup.get(eventNodeName);
+        return nodeToGroup.getOrDefault(eventNodeName, Collections.EMPTY_SET);
     }
 
     @Override

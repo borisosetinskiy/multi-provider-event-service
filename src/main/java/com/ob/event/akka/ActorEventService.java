@@ -20,10 +20,8 @@ import scala.concurrent.duration.FiniteDuration;
 import javax.annotation.PostConstruct;
 import java.util.Collection;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -38,16 +36,43 @@ import static akka.dispatch.Futures.future;
  */
 public class ActorEventService extends WithActorService implements EventService< Future, Class, Object> {
     private static final Logger logger = LoggerFactory.getLogger(ActorEventService.class);
-    private ExecutionContext futureExecutionContext = ExecutionContexts.fromExecutor(Executors.newCachedThreadPool(new TFactory()));
-    private Map<String, EventNodeUnion> unions = new ConcurrentHashMap<>(8, 0.75f, 64);
+    private ExecutionContext futureHardContext;
+    private ExecutionContext futureSoftContext;
+    private Map<String, EventNodeUnion> unions = new ConcurrentHashMap<>(32, 0.75f, 64);
     private Map<String, EventNode> eventNodes = new ConcurrentHashMap<>(32, 0.75f, 64);
-    private Map<Integer, ILookup> akkaLookups = new ConcurrentHashMap<>(8, 0.75f, 64);
-    private static final String DEFAULT_UNION_ID = "z"+System.currentTimeMillis();
+    private Map<Integer, ILookup> akkaLookups = new ConcurrentHashMap<>(16, 0.75f, 64);
+    public static final String DEFAULT_UNION_ID = "z"+System.currentTimeMillis();
     private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
     private AkkaEventTimeoutService akkaEventTimeoutService;
 
-    public ActorEventService() {
-      //DON'T DO HERE
+    public ActorEventService(){
+        this(64, 64, 64, 64
+                , Runtime.getRuntime().availableProcessors()
+                , 0, Integer.MAX_VALUE);
+    }
+    public ActorEventService(int unionConcurrency
+            , int eventConcurrency
+            , int lookupConcurrency
+            , int timeoutConcurrency
+            , int softSize
+            , int hardSize
+            , int maxHardSize) {
+       unions = new ConcurrentHashMap<>(32, 0.75f, unionConcurrency);
+       eventNodes = new ConcurrentHashMap<>(32, 0.75f, eventConcurrency);
+       akkaLookups = new ConcurrentHashMap<>(32, 0.75f, lookupConcurrency);
+       futureHardContext = ExecutionContexts.fromExecutor(
+               new ThreadPoolExecutor(hardSize, maxHardSize,
+                60L, TimeUnit.SECONDS,
+                new SynchronousQueue<Runnable>(),
+                new TFactory(DEFAULT_UNION_ID)));
+        futureSoftContext =  ExecutionContexts.fromExecutor(Executors.newWorkStealingPool(softSize));
+        akkaEventTimeoutService = new AkkaEventTimeoutService(timeoutConcurrency);
+    }
+
+    @Override
+    @PostConstruct
+    public void start() {
+        create(akkaEventTimeoutService.name(), akkaEventTimeoutService.name(), () -> akkaEventTimeoutService);
     }
 
     public Map<String, EventNodeUnion> getUnions() {
@@ -63,9 +88,7 @@ public class ActorEventService extends WithActorService implements EventService<
         if(!(o instanceof ActorRef ))
             throw new RuntimeException("Recipient does not have akka ref...");
         ActorRef recipient0 = (ActorRef)o;
-        if(!recipient0.isTerminated()){
-            recipient0.tell(event, sender(sender));
-        }
+        recipient0.tell(event, sender(sender));
     }
 
     /*Unblocked method*/
@@ -119,7 +142,12 @@ public class ActorEventService extends WithActorService implements EventService<
     /*Unblocked method*/
     @Override
     public <V> Future<V> execute(Callable<V> callable) {
-        return future(callable, futureExecutionContext);
+        return future(callable, futureHardContext);
+    }
+
+    @Override
+    public <V> Future executeSoft(Callable<V> callable) {
+        return future(callable, futureSoftContext);
     }
 
     EventNodeUnion createEventNodeUnion(String unionName){
@@ -313,7 +341,7 @@ public class ActorEventService extends WithActorService implements EventService<
                 }
             }
             return null;
-        }, futureExecutionContext);
+        }, futureHardContext);
     }
 
 
@@ -346,12 +374,7 @@ public class ActorEventService extends WithActorService implements EventService<
         return (sender==null)?ActorRef.noSender():sender.unwrap();
     }
 
-    @Override
-    @PostConstruct
-    public void start() {
-        akkaEventTimeoutService = new AkkaEventTimeoutService();
-        create(akkaEventTimeoutService.name(), akkaEventTimeoutService.name(), () -> akkaEventTimeoutService);
-    }
+
 
     @Override
     public void stop() {
@@ -449,78 +472,90 @@ public class ActorEventService extends WithActorService implements EventService<
         };
     }
 
-    static final Consumer EMPTY_CONSUMER = o -> {};
     class AkkaEventTimeoutService extends AkkaEventLogic implements EventTimeoutService {
-
-        private Map<Object, EventTimeout> eventTimeouts = new ConcurrentHashMap<>();
-
-        protected AkkaEventTimeoutService() {
+        private ScheduledExecutorService scheduler;
+        private Map<Object, EventTimeout> events;
+        protected AkkaEventTimeoutService(int concurrencyLevel) {
             super("EVENT_TIMEOUT");
+            events =  new ConcurrentHashMap(0, 0.75f, concurrencyLevel);
+            scheduler = Executors.newScheduledThreadPool(1, new TFactory(name()));
         }
+
+
         @Override
-        public void tellEvent(Object id, EventNode recipient, Object event,  EventTimeoutOption eventTimeoutOption, Consumer complete, Consumer cancel) {
+        public Future tellEvent(Object id, EventNode recipient, Object event
+                ,  int timeout, EventListener eventListener) {
             if(recipient == null)
                 throw new RuntimeException("Recipient can't be null");
             if(event == null)
                 throw new RuntimeException("Event can't be null");
             if(id == null)
                 throw new RuntimeException("Id can't be null");
-            final Consumer remove = o -> {
-                try {
-                    if(this.eventTimeouts.remove(id)!= null){
-                        logger.debug(String.format("Event %s removed", id));
+            long time = System.currentTimeMillis();
+            return execute((Callable<Object>) () -> events.computeIfAbsent(id, o -> {
+                final EventTimeout eventTimeout =  new EventTimeout(){
+                    private AtomicBoolean canceled = new AtomicBoolean();
+                    private EventCallback callback = new EventCallback() {
+                        @Override
+                        public Object getId() {
+                            return id;
+                        }
+                        @Override
+                        public Object call() {
+                            try {
+                                if (canceled.get()) throw new EventCanceledException(id);
+                                return event;
+                            }finally {
+                                events.remove(id);
+                            }
+                        }
+                    };
+                    @Override
+                    public void cancel() {
+                        canceled.set(true);
+                        if(events.remove(id)!=null && eventListener!=null){
+                            eventListener.onCancel(event);
+                        }
                     }
-                } catch (Exception e) {
-                }
-            };
-            final EventTimeout eventTimeout = new EventTimeout(id,  event, eventTimeoutOption
-                    ,  remove.andThen(complete!=null?complete:EMPTY_CONSUMER)
-                    ,  remove.andThen(cancel!=null?cancel:EMPTY_CONSUMER) );
-            this.eventTimeouts.put(eventTimeout.getId(), eventTimeout);
-            send(eventTimeout, recipient);
+                    @Override
+                    public boolean isTimeout() {
+                        return System.currentTimeMillis() - time >= timeout;
+                    }
+                    @Override
+                    public EventCallback eventCallback() {
+                        return callback;
+                    }
+                };
+                ActorEventService.this.tellEvent(getEventNodeObject(),  recipient
+                        , eventTimeout.eventCallback());
+                return eventTimeout;
+            }));
         }
 
-        void send(EventTimeout eventTimeout, EventNode recipient){
-            ActorEventService.this.tellEvent(this.getEventNodeObject(),  recipient,  eventTimeout);
-            logger.debug(String.format("Sent %s", eventTimeout));
-        }
 
         @Override
         public void start() {
+            scheduler.scheduleWithFixedDelay(() -> {
+                for (EventTimeout eventTimeout : events.values()) {
+                    try {
+                        if(eventTimeout.isTimeout())eventTimeout.cancel();
+                    } catch (Exception e) {
+                    }
+                }
+            }, 0, 1, TimeUnit.SECONDS);
             logger.info("Timeout service started...");
-            ActorEventService.this.scheduledEvent(getEventNodeObject(), getEventNodeObject(), CHECK_TIMEOUT.i, TimeUnit.MILLISECONDS, 500);
         }
 
         @Override
         public void stop() {
+            if(!scheduler.isShutdown())
+                scheduler.shutdown();
             logger.info("Timeout service stopped...");
-        }
-
-
-
-        @Override
-        public void tellSync(Object event) {
-
         }
 
         @Override
         public void onEvent(Object event, EventNodeEndPoint sender) {
-            if(event instanceof CHECK_TIMEOUT){
-                try {
-                    for (EventTimeout eventTimeout : eventTimeouts.values()) {
-                        try {
-                            if (eventTimeout.isTimeout()) {
-                                eventTimeout.cancel();
-                                logger.debug(String.format("Event %s canceled", eventTimeout.getId()));
-                            }
-                        } catch (Exception e) {
-                        }
-                    }
-                }catch (Exception e){}
-            }
+
         }
-    }
-    static final class CHECK_TIMEOUT {
-        final static CHECK_TIMEOUT i = new CHECK_TIMEOUT();
     }
 }

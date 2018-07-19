@@ -1,8 +1,10 @@
 package com.ob.event;
 
-import java.util.function.Consumer;
+
+import scala.concurrent.Future;
 
 public interface EventTimeoutService {
-    void tellEvent(Object id, EventNode recipient, Object event, EventTimeoutOption eventTimeoutOption, Consumer complete, Consumer cancel);
+    Future tellEvent(Object id, EventNode recipient, Object event
+            , int timeout, EventListener eventListener);
 
 }
