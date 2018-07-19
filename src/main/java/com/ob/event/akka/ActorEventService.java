@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static akka.dispatch.Futures.future;
@@ -326,22 +325,8 @@ public class ActorEventService extends WithActorService implements EventService<
     }
 
     @Override
-    public void lazyCreate(String name, String unionId, EventLogicFactory eventLogicFactory, Consumer onSuccess, Consumer onFailure) {
-                final String union = (unionId == null)? DEFAULT_UNION_ID :unionId;
-        Future<EventNode> future = execute(() -> create(name, union, eventLogicFactory));
-        future.onComplete(v1 -> {
-            if(v1.isFailure()){
-                if(onFailure!=null){
-                    onFailure.accept(v1.failed().get());
-                }
-            }
-            if(v1.isSuccess()){
-                if(onSuccess!=null){
-                    onSuccess.accept(v1.get()); ;
-                }
-            }
-            return null;
-        }, futureHardContext);
+    public Future<EventNode> createAsync(String name, String unionId, EventLogicFactory eventLogicFactory) {
+        return execute(() -> create(name, unionId, eventLogicFactory));
     }
 
 

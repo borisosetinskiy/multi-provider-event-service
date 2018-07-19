@@ -1,14 +1,12 @@
 package com.ob.event;
 
 
-import java.util.function.Consumer;
+
 
 /**
  * Created by boris on 1/29/2017.
  */
-public interface EventNodeFactory {
+public interface EventNodeFactory<T> {
     EventNode create(String name, String unionId, EventLogicFactory eventLogicFactory);
-    void lazyCreate (String name, String unionId, EventLogicFactory eventLogicFactory
-            , Consumer<EventNode> onSuccess
-            , Consumer<Throwable> onFailure);
+    T createAsync (String name, String unionId, EventLogicFactory eventLogicFactory);
 }

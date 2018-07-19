@@ -3,7 +3,7 @@ package com.ob.event;
 /**
  * Created by boris on 1/28/2017.
  */
-public interface EventService<F, T, L> extends EventNodeFactory, EventNodeScheduledService
+public interface EventService<F, T, L> extends EventNodeFactory<F>, EventNodeScheduledService
         , ExecutableContext<F>, EventStream<T>, EventLookup<L>, EventEndPointService, Service, EventNodeRouterService {
     void release(String name);
     EventNode getEventNode(String name);

@@ -5,7 +5,6 @@ import com.ob.event.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * Created by boris on 1/28/2017.
@@ -84,14 +83,10 @@ public class DisruptorEventService implements EventService<Future, Object, Objec
         return null;
     }
 
-
-
     @Override
-    public void lazyCreate(String name, String unionId, EventLogicFactory eventLogicFactory, Consumer onSuccess, Consumer onFailure) {
-
+    public Future<EventNode> createAsync(String name, String unionId, EventLogicFactory eventLogicFactory) {
+        return null;
     }
-
-
 
 
     @Override
