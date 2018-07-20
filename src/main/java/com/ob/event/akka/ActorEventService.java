@@ -37,35 +37,27 @@ public class ActorEventService extends WithActorService implements EventService<
     private static final Logger logger = LoggerFactory.getLogger(ActorEventService.class);
     private ExecutionContext futureHardContext;
     private ExecutionContext futureSoftContext;
-    private Map<String, EventNodeUnion> unions = new ConcurrentHashMap<>(32, 0.75f, 64);
-    private Map<String, EventNode> eventNodes = new ConcurrentHashMap<>(32, 0.75f, 64);
-    private Map<Integer, ILookup> akkaLookups = new ConcurrentHashMap<>(16, 0.75f, 64);
+    private Map<String, EventNodeUnion> unions;
+    private Map<String, EventNode> eventNodes;
+    private Map<Integer, ILookup> akkaLookups;
     public static final String DEFAULT_UNION_ID = "z"+System.currentTimeMillis();
     private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
     private AkkaEventTimeoutService akkaEventTimeoutService;
 
     public ActorEventService(){
-        this(64, 64, 64, 64
-                , Runtime.getRuntime().availableProcessors()
-                , 0, Integer.MAX_VALUE);
+        this(AkkaEventServiceConfig.DEFAULT_AKKA_EVENT_SERVICE_CONFIG);
     }
-    public ActorEventService(int unionConcurrency
-            , int eventConcurrency
-            , int lookupConcurrency
-            , int timeoutConcurrency
-            , int softSize
-            , int hardSize
-            , int maxHardSize) {
-       unions = new ConcurrentHashMap<>(32, 0.75f, unionConcurrency);
-       eventNodes = new ConcurrentHashMap<>(32, 0.75f, eventConcurrency);
-       akkaLookups = new ConcurrentHashMap<>(32, 0.75f, lookupConcurrency);
+    public ActorEventService(AkkaEventServiceConfig akkaEventServiceConfig) {
+       unions = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getUnionConcurrency());
+       eventNodes = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getEventConcurrency());
+       akkaLookups = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getLookupConcurrency());
        futureHardContext = ExecutionContexts.fromExecutor(
-               new ThreadPoolExecutor(hardSize, maxHardSize,
-                60L, TimeUnit.SECONDS,
+               new ThreadPoolExecutor(akkaEventServiceConfig.getHardSize(), akkaEventServiceConfig.getMaxHardSize(),
+                       akkaEventServiceConfig.getKeepAliveTime(), TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(),
                 new TFactory(DEFAULT_UNION_ID)));
-        futureSoftContext =  ExecutionContexts.fromExecutor(Executors.newWorkStealingPool(softSize));
-        akkaEventTimeoutService = new AkkaEventTimeoutService(timeoutConcurrency);
+        futureSoftContext =  ExecutionContexts.fromExecutor(Executors.newWorkStealingPool(akkaEventServiceConfig.getSoftSize()));
+        akkaEventTimeoutService = new AkkaEventTimeoutService(akkaEventServiceConfig.getTimeoutConcurrency());
     }
 
     @Override
