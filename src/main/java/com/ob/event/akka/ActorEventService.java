@@ -5,6 +5,7 @@ import akka.actor.Props;
 import akka.dispatch.ExecutionContexts;
 import akka.routing.Router;
 import akka.routing.RoutingLogic;
+import com.google.common.collect.Collections2;
 import com.ob.common.akka.ActorUtil;
 import com.ob.common.akka.TFactory;
 import com.ob.common.akka.WithActorService;
@@ -19,6 +20,7 @@ import scala.concurrent.duration.FiniteDuration;
 
 import javax.annotation.PostConstruct;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,16 +35,20 @@ import static akka.dispatch.Futures.future;
 /**
  * Created by boris on 1/28/2017.
  */
-public class ActorEventService extends WithActorService implements EventService< Future, Class, Object> {
+public class ActorEventService extends WithActorService implements EventService<Future, Class, Object> {
     private static final Logger logger = LoggerFactory.getLogger(ActorEventService.class);
     private ExecutionContext futureHardContext;
-    private ExecutionContext futureSoftContext;
     private Map<String, EventNodeUnion> unions;
     private Map<String, EventNode> eventNodes;
     private Map<Integer, ILookup> akkaLookups;
     public static final String DEFAULT_UNION_ID = "z"+System.currentTimeMillis();
-    private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
+    //private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
     private AkkaEventTimeoutService akkaEventTimeoutService;
+    private AkkaExecutableContext akkaExecutableContext;
+    private AkkaEventStream akkaEventStream;
+    private AkkaEventLookup akkaEventLookup;
+    private AkkaEventNodeRouterService akkaEventNodeRouterService;
+    private AkkaEventNodeScheduledService akkaEventNodeScheduledService;
 
     public ActorEventService(){
         this(AkkaEventServiceConfig.DEFAULT_AKKA_EVENT_SERVICE_CONFIG);
@@ -56,8 +62,13 @@ public class ActorEventService extends WithActorService implements EventService<
                        akkaEventServiceConfig.getKeepAliveTime(), TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(),
                 new TFactory(DEFAULT_UNION_ID)));
-        futureSoftContext =  ExecutionContexts.fromExecutor(Executors.newWorkStealingPool(akkaEventServiceConfig.getSoftSize()));
         akkaEventTimeoutService = new AkkaEventTimeoutService(akkaEventServiceConfig.getTimeoutConcurrency());
+        akkaExecutableContext = new AkkaExecutableContext();
+        akkaEventStream = new AkkaEventStream();
+        akkaEventLookup = new AkkaEventLookup();
+        akkaEventNodeRouterService = new AkkaEventNodeRouterService();
+        akkaEventNodeScheduledService = new AkkaEventNodeScheduledService();
+
     }
 
     @Override
@@ -88,36 +99,6 @@ public class ActorEventService extends WithActorService implements EventService<
         actorService.getActorSystem().actorSelection(recipient).tell(event, sender(sender));
     }
 
-    /*Unblocked method*/
-    @Override
-    public void publishStream(Object event) {
-        actorService.getActorSystem().eventStream().publish(event);
-    }
-
-    /*Unblocked method*/
-    @Override
-    public void subscribeStream(EventNode subscriber, Class event) {
-        actorService.getActorSystem().eventStream().subscribe((ActorRef) subscriber.unwrap(), event);
-    }
-
-    /*Unblocked method*/
-    @Override
-    public void removeStream(EventNode subscriber, Class event) {
-        actorService.getActorSystem().eventStream().unsubscribe((ActorRef)subscriber.unwrap(), event);
-    }
-
-    @Override
-    public void scheduledEvent(EventNode sender, EventNode recipient, Object event, TimeUnit tu, int time) {
-        ActorRef recipient0 = (ActorRef)recipient.unwrap();
-        scheduledEvent0(sender(sender), recipient0, event, tu, time);
-    }
-
-    @Override
-    public void scheduledEvent(EventNode sender, String recipient, Object event, TimeUnit tu, int time) {
-        ActorRef recipient0 = actorService.getActorSystem().actorFor(recipient);
-        scheduledEvent0(sender(sender), recipient0, event, tu, time);
-    }
-
     void scheduledEvent0(ActorRef sender, ActorRef recipient, Object event, TimeUnit tu, int time) {
         if(recipient!=null && !recipient.isTerminated()) {
             actorService.getActorSystem().scheduler().schedule(
@@ -125,20 +106,6 @@ public class ActorEventService extends WithActorService implements EventService<
                     actorService.getActorSystem().dispatcher(), sender
             );
         }
-    }
-
-
-
-
-    /*Unblocked method*/
-    @Override
-    public <V> Future<V> execute(Callable<V> callable) {
-        return future(callable, futureHardContext);
-    }
-
-    @Override
-    public <V> Future executeSoft(Callable<V> callable) {
-        return future(callable, futureSoftContext);
     }
 
     EventNodeUnion createEventNodeUnion(String unionName){
@@ -206,9 +173,9 @@ public class ActorEventService extends WithActorService implements EventService<
 
     EventNodeObject<ActorRef> createEventNodeObject(final String name, String unionName
             , final EventLogicFactory eventLogicFactory){
-        EventNodeObject<ActorRef> node =  new EventNodeObject<ActorRef>() {
+        return new EventNodeObject<ActorRef>() {
             final ObjectOpenHashSet topics = new ObjectOpenHashSet();
-            final EventLogic eventLogic = eventLogicFactory.create();
+            final AkkaEventLogic eventLogic = (AkkaEventLogic) eventLogicFactory.create();
             private ActorRef actor;
             Lock actorLock = new ReentrantLock();
             {
@@ -276,9 +243,12 @@ public class ActorEventService extends WithActorService implements EventService<
             public void release() {
                 try{
                     topics.clear();
-                    unions.remove(name);
                     eventNodes.remove(name);
-                    eventNodeGroupService.removeGroups(name);
+                    EventNodeUnion eventNodeUnion = unions.get(unionName);
+                    if(eventNodeUnion!=null){
+                        eventNodeUnion.remove(this);
+                    }
+                    //eventNodeGroupService.removeGroups(name);
                 }catch (Exception e){}finally{
                     try {
                         ActorUtil.gracefulReadyStop(actor());
@@ -304,7 +274,6 @@ public class ActorEventService extends WithActorService implements EventService<
                         ']';
             }
         };
-        return node;
     }
 
 
@@ -318,7 +287,7 @@ public class ActorEventService extends WithActorService implements EventService<
 
     @Override
     public Future<EventNode> createAsync(String name, String unionId, EventLogicFactory eventLogicFactory) {
-        return execute(() -> create(name, unionId, eventLogicFactory));
+        return akkaExecutableContext.execute(() -> create(name, unionId, eventLogicFactory));
     }
 
 
@@ -338,14 +307,15 @@ public class ActorEventService extends WithActorService implements EventService<
     }
 
     @Override
-    public EventNodeGroupService getEventNodeGroupService() {
-        return eventNodeGroupService;
-    }
-
-    @Override
     public EventTimeoutService getEventTimeoutService() {
         return akkaEventTimeoutService;
     }
+
+    @Override
+    public Collection<EventNode> getEventNodes() {
+        return eventNodes.values();
+    }
+
 
     private ActorRef sender(EventNode<ActorRef> sender){
         return (sender==null)?ActorRef.noSender():sender.unwrap();
@@ -358,98 +328,11 @@ public class ActorEventService extends WithActorService implements EventService<
         //Nothing
     }
 
-    static int toLockupId(int hash){
-        return hash % 10;
-    }
-    @Override
-    public boolean subscribeLookup(EventNode subscriber, Object topic) {
-        return subscribeLookup(toLockupId(topic.hashCode()), subscriber,  topic);
-    }
 
-    @Override
-    public void removeLookup(EventNode subscriber, Object topic) {
-        removeLookup(toLockupId(topic.hashCode()), subscriber, topic);
-    }
 
-    @Override
-    public void publishEvent(EventEnvelope<Object> event) {
-        publishEvent(event.getLookupId(), event);
-    }
 
-    @Override
-    public boolean subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
-        if(subscriber!=null) {
-            synchronized (subscriber){
-                if (akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).subscribe(subscriber.unwrap(), topic)) {
-                    subscriber.topics().add(topic);
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 
-    @Override
-    public void removeLookup(int lookupId, EventNode subscriber, Object topic) {
-        if(subscriber!=null) {
-            synchronized (subscriber){
-                if(akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).unsubscribe(subscriber.unwrap(), topic)){
-                    subscriber.topics().remove(topic);
-                }
-            }
-        }
-    }
-
-    @Override
-    public void publishEvent(int lookupId, EventEnvelope<Object> event) {
-        akkaLookups.getOrDefault(lookupId, ILookup.EMPTY).publish(event);
-    }
-
-    @Override
-    public EventNodeRouter create(String name, RouterLogicFactory routerLogicFactory) {
-        return new EventNodeRouter(){
-            protected Router router;
-            private Map<String, EventNode> nodes = new ConcurrentHashMap<>();
-            {
-                router = new Router((RoutingLogic) routerLogicFactory.create().unwrap());
-            }
-            @Override
-            public Collection<EventNode> getNodes() {
-                return nodes.values();
-            }
-
-            @Override
-            public void addNode(EventNode node) {
-                router.addRoutee((ActorRef) node.unwrap());
-                nodes.put(node.name(), node);
-            }
-
-            @Override
-            public void removeNode(EventNode node) {
-                router.removeRoutee((ActorRef) node.unwrap());
-                nodes.remove(node.name());
-            }
-            @Override
-            public void tell(Object event, EventNode sender) {
-                router.route(event, (ActorRef) sender.unwrap());
-            }
-
-            @Override
-            public String name() {
-                return name;
-            }
-
-            @Override
-            public void release() {
-                nodes.values().forEach(node -> {
-                    removeNode(node);
-                    node.release();
-                });
-            }
-        };
-    }
-
-    class AkkaEventTimeoutService extends AkkaEventLogic implements EventTimeoutService {
+    class AkkaEventTimeoutService extends AkkaEventLogicImpl implements EventTimeoutService {
         private ScheduledExecutorService scheduler;
         private Map<Object, EventTimeout> events;
         protected AkkaEventTimeoutService(int concurrencyLevel) {
@@ -469,7 +352,7 @@ public class ActorEventService extends WithActorService implements EventService<
             if(id == null)
                 throw new RuntimeException("Id can't be null");
             long time = System.currentTimeMillis();
-            return execute((Callable<Object>) () -> events.computeIfAbsent(id, o -> {
+            return akkaExecutableContext.execute((Callable<Object>) () -> events.computeIfAbsent(id, o -> {
                 final EventTimeout eventTimeout =  new EventTimeout(){
                     private AtomicBoolean canceled = new AtomicBoolean();
                     private EventCallback callback = new EventCallback() {
@@ -531,8 +414,196 @@ public class ActorEventService extends WithActorService implements EventService<
         }
 
         @Override
+        public Map<String, Object> getOption() {
+            return null;
+        }
+
+        @Override
         public void onEvent(Object event, Class clazz) {
 
         }
     }
+
+    @Override
+    public ExecutableContext<Future> getExecutableContext() {
+        return akkaExecutableContext;
+    }
+
+    @Override
+    public EventStream<Class> getEventStream() {
+        return akkaEventStream;
+    }
+
+    @Override
+    public EventLookup<Object> getEventLookup() {
+        return akkaEventLookup;
+    }
+
+    @Override
+    public EventNodeRouterService getEventNodeRouterService() {
+        return akkaEventNodeRouterService;
+    }
+
+    @Override
+    public EventNodeScheduledService getEventNodeScheduledService() {
+        return akkaEventNodeScheduledService;
+    }
+
+    class AkkaEventNodeScheduledService implements EventNodeScheduledService{
+
+        @Override
+        public void scheduledEvent(EventNode sender, EventNode recipient, Object event, TimeUnit tu, int time) {
+            ActorRef recipient0 = (ActorRef)recipient.unwrap();
+            scheduledEvent0(sender(sender), recipient0, event, tu, time);
+        }
+
+        @Override
+        public void scheduledEvent(EventNode sender, String recipient, Object event, TimeUnit tu, int time) {
+            ActorRef recipient0 = actorService.getActorSystem().actorFor(recipient);
+            scheduledEvent0(sender(sender), recipient0, event, tu, time);
+        }
+
+        @Override
+        public void start() {
+
+        }
+
+        @Override
+        public void stop() {
+
+        }
+    }
+
+    class  AkkaEventNodeRouterService implements EventNodeRouterService{
+
+        @Override
+        public EventNodeRouter create(String name, RouterLogicFactory routerLogicFactory) {
+            return new EventNodeRouter(){
+                protected Router router;
+                private Map<String, EventNode> nodes = new ConcurrentHashMap<>();
+                {
+                    router = new Router((RoutingLogic) routerLogicFactory.create().unwrap());
+                }
+                @Override
+                public Collection<EventNode> getNodes() {
+                    return nodes.values();
+                }
+
+                @Override
+                public void addNode(EventNode node) {
+                    router.addRoutee((ActorRef) node.unwrap());
+                    nodes.put(node.name(), node);
+                }
+
+                @Override
+                public void removeNode(EventNode node) {
+                    router.removeRoutee((ActorRef) node.unwrap());
+                    nodes.remove(node.name());
+                }
+                @Override
+                public void tell(Object event, EventNode sender) {
+                    router.route(event, (ActorRef) sender.unwrap());
+                }
+
+                @Override
+                public String name() {
+                    return name;
+                }
+
+                @Override
+                public void release() {
+                    nodes.values().forEach(node -> {
+                        removeNode(node);
+                        node.release();
+                    });
+                }
+            };
+        }
+    }
+
+    static int toLockupId(int hash){
+        return hash % 10;
+    }
+    class AkkaEventLookup implements EventLookup<Object>{
+        @Override
+        public boolean subscribeLookup(EventNode subscriber, Object topic) {
+            return subscribeLookup(toLockupId(topic.hashCode()), subscriber,  topic);
+        }
+
+        @Override
+        public void removeLookup(EventNode subscriber, Object topic) {
+            removeLookup(toLockupId(topic.hashCode()), subscriber, topic);
+        }
+
+        @Override
+        public void publishEvent(EventEnvelope<Object> event) {
+            publishEvent(event.getLookupId(), event);
+        }
+
+        @Override
+        public boolean subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
+            if(subscriber!=null) {
+                synchronized (subscriber){
+                    if (akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).subscribe(subscriber.unwrap(), topic)) {
+                        subscriber.topics().add(topic);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void removeLookup(int lookupId, EventNode subscriber, Object topic) {
+            if(subscriber!=null) {
+                synchronized (subscriber){
+                    if(akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).unsubscribe(subscriber.unwrap(), topic)){
+                        subscriber.topics().remove(topic);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void publishEvent(int lookupId, EventEnvelope<Object> event) {
+            akkaLookups.getOrDefault(lookupId, ILookup.EMPTY).publish(event);
+        }
+    }
+
+    class AkkaExecutableContext implements ExecutableContext<Future>{
+        @Override
+        public <V> Future<V> execute(Callable<V> callable) {
+            return future(callable, futureHardContext);
+        }
+
+        @Override
+        public void start() {
+
+        }
+        @Override
+        public void stop() {
+
+        }
+    }
+
+    class AkkaEventStream implements EventStream<Class>{
+        /*Unblocked method*/
+        @Override
+        public void publishStream(Object event) {
+            actorService.getActorSystem().eventStream().publish(event);
+        }
+
+        /*Unblocked method*/
+        @Override
+        public void subscribeStream(EventNode subscriber, Class event) {
+            actorService.getActorSystem().eventStream().subscribe((ActorRef) subscriber.unwrap(), event);
+        }
+
+        /*Unblocked method*/
+        @Override
+        public void removeStream(EventNode subscriber, Class event) {
+            actorService.getActorSystem().eventStream().unsubscribe((ActorRef)subscriber.unwrap(), event);
+        }
+    }
+
 }

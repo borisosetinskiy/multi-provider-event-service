@@ -7,5 +7,4 @@ import java.util.concurrent.Callable;
  */
 public interface ExecutableContext<F> extends Service{
     <V> F execute(Callable<V> callable);
-    <V> F executeSoft(Callable<V> callable);
 }

@@ -10,11 +10,11 @@ import com.ob.event.EventLogic;
  * Created by boris on 1/30/2017.
  */
 public class AkkaActor extends AbstractActor {
-    private final EventLogic logic;
-    public AkkaActor(EventLogic logic) {
+    private final AkkaEventLogic logic;
+    public AkkaActor(AkkaEventLogic logic) {
         this.logic = logic;
     }
-    public static Props props(EventLogic logic) {
+    public static Props props(AkkaEventLogic logic) {
         return Props.create(new Creator<AkkaActor>() {
             private static final long serialVersionUID = 1L;
             @Override

@@ -10,9 +10,7 @@ import java.util.concurrent.TimeUnit;
  * Created by boris on 1/30/2017.
  */
 public interface EventNodeObject<T> extends EventNode<T>, EventScheduler {
-    EventLogic getEventLogic();
     EventService getEventService();
-    Logger logger = LoggerFactory.getLogger(EventNodeObject.class);
 
     EventNodeObject EMPTY = new EventNodeObject(){
         @Override
@@ -42,7 +40,6 @@ public interface EventNodeObject<T> extends EventNode<T>, EventScheduler {
 
         @Override
         public void tell(Object event, EventNode sender) {
-            logger.warn(String.format("Can't send %s stack %s", event, Thread.currentThread().getStackTrace()));
         }
 
         @Override

@@ -1,14 +1,17 @@
 package com.ob.event;
 
+import java.util.Collections;
+import java.util.Map;
+import java.util.Properties;
+
 /**
  * Created by boris on 1/30/2017.
  */
 public interface EventLogic extends EventNodeListener, OnEventNode, EventNodeEndPoint, Releasable, EventNodeSyncEndPoint {
     void start();
     void stop();
-    String withDispatcher();
-    String withMailbox();
-    Class[] getMatchers();
+    Map<String, Object> getOption();
+
 
     EventLogic EMPTY = new EventLogic(){
 
@@ -55,18 +58,9 @@ public interface EventLogic extends EventNodeListener, OnEventNode, EventNodeEnd
         }
 
         @Override
-        public String withDispatcher() {
-            return null;
+        public Map<String, Object> getOption() {
+            return Collections.EMPTY_MAP;
         }
 
-        @Override
-        public String withMailbox() {
-            return null;
-        }
-
-        @Override
-        public Class[] getMatchers() {
-            return new Class[0];
-        }
     };
 }
