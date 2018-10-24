@@ -11,6 +11,15 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
     private int hardSize = 0;
     private int maxHardSize = Integer.MAX_VALUE;
     private long keepAliveTime = 60l;
+    private int lookUpConcurrency = 10;
+
+    public int getLookUpConcurrency() {
+        return lookUpConcurrency;
+    }
+
+    public void setLookUpConcurrency(int lookUpConcurrency) {
+        this.lookUpConcurrency = lookUpConcurrency;
+    }
 
     public int getUnionConcurrency() {
         return unionConcurrency;

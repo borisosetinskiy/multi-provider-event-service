@@ -42,6 +42,7 @@ public class ActorEventService extends WithActorService implements EventService<
     private Map<String, EventNode> eventNodes;
     private Map<Integer, ILookup> akkaLookups;
     public static final String DEFAULT_UNION_ID = "z"+System.currentTimeMillis();
+
     //private EventNodeGroupService eventNodeGroupService = new EventNodeGroupServiceImpl();
     private AkkaEventTimeoutService akkaEventTimeoutService;
     private AkkaExecutableContext akkaExecutableContext;
@@ -50,14 +51,16 @@ public class ActorEventService extends WithActorService implements EventService<
     private AkkaEventNodeRouterService akkaEventNodeRouterService;
     private AkkaEventNodeScheduledService akkaEventNodeScheduledService;
 
+    private AkkaEventServiceConfig akkaEventServiceConfig;
     public ActorEventService(){
         this(AkkaEventServiceConfig.DEFAULT_AKKA_EVENT_SERVICE_CONFIG);
     }
     public ActorEventService(AkkaEventServiceConfig akkaEventServiceConfig) {
-       unions = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getUnionConcurrency());
-       eventNodes = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getEventConcurrency());
-       akkaLookups = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getLookupConcurrency());
-       futureHardContext = ExecutionContexts.fromExecutor(
+       this.akkaEventServiceConfig = akkaEventServiceConfig;
+       this.unions = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getUnionConcurrency());
+       this.eventNodes = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getEventConcurrency());
+       this.akkaLookups = new ConcurrentHashMap<>(32, 0.75f, akkaEventServiceConfig.getLookupConcurrency());
+        this.futureHardContext = ExecutionContexts.fromExecutor(
                new ThreadPoolExecutor(akkaEventServiceConfig.getHardSize(), akkaEventServiceConfig.getMaxHardSize(),
                        akkaEventServiceConfig.getKeepAliveTime(), TimeUnit.SECONDS,
                 new SynchronousQueue<Runnable>(),
@@ -462,16 +465,6 @@ public class ActorEventService extends WithActorService implements EventService<
             ActorRef recipient0 = actorService.getActorSystem().actorFor(recipient);
             scheduledEvent0(sender(sender), recipient0, event, tu, time);
         }
-
-        @Override
-        public void start() {
-
-        }
-
-        @Override
-        public void stop() {
-
-        }
     }
 
     class  AkkaEventNodeRouterService implements EventNodeRouterService{
@@ -521,8 +514,8 @@ public class ActorEventService extends WithActorService implements EventService<
         }
     }
 
-    static int toLockupId(int hash){
-        return hash % 10;
+    int toLockupId(int hash){
+        return hash % akkaEventServiceConfig.getLookUpConcurrency();
     }
     class AkkaEventLookup implements EventLookup<Object>{
         @Override
@@ -537,7 +530,7 @@ public class ActorEventService extends WithActorService implements EventService<
 
         @Override
         public void publishEvent(EventEnvelope<Object> event) {
-            publishEvent(event.getLookupId(), event);
+            publishEvent(toLockupId(event.topic().hashCode()), event);
         }
 
         @Override
