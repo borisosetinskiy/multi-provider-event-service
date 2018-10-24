@@ -5,5 +5,4 @@ package com.ob.event;
  */
 public interface EventEnvelope<T> {
     T topic();
-    int getLookupId();
 }

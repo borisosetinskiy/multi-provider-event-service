@@ -5,7 +5,7 @@ import akka.actor.Props;
 import akka.dispatch.ExecutionContexts;
 import akka.routing.Router;
 import akka.routing.RoutingLogic;
-import com.google.common.collect.Collections2;
+import com.google.common.collect.Sets;
 import com.ob.common.akka.ActorUtil;
 import com.ob.common.akka.TFactory;
 import com.ob.common.akka.WithActorService;
@@ -20,8 +20,8 @@ import scala.concurrent.duration.FiniteDuration;
 
 import javax.annotation.PostConstruct;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -177,7 +177,7 @@ public class ActorEventService extends WithActorService implements EventService<
     EventNodeObject<ActorRef> createEventNodeObject(final String name, String unionName
             , final EventLogicFactory eventLogicFactory){
         return new EventNodeObject<ActorRef>() {
-            final ObjectOpenHashSet topics = new ObjectOpenHashSet();
+            final Set topics = Sets.newConcurrentHashSet();
             final AkkaEventLogic eventLogic = (AkkaEventLogic) eventLogicFactory.create();
             private ActorRef actor;
             Lock actorLock = new ReentrantLock();
@@ -237,7 +237,7 @@ public class ActorEventService extends WithActorService implements EventService<
             }
 
             @Override
-            public ObjectOpenHashSet topics() {
+            public Set topics() {
                 return topics;
             }
 
@@ -323,15 +323,6 @@ public class ActorEventService extends WithActorService implements EventService<
     private ActorRef sender(EventNode<ActorRef> sender){
         return (sender==null)?ActorRef.noSender():sender.unwrap();
     }
-
-
-
-    @Override
-    public void stop() {
-        //Nothing
-    }
-
-
 
 
 
@@ -515,7 +506,7 @@ public class ActorEventService extends WithActorService implements EventService<
     }
 
     int toLockupId(int hash){
-        return hash % akkaEventServiceConfig.getLookUpConcurrency();
+        return hash % akkaEventServiceConfig.getLookupSize();
     }
     class AkkaEventLookup implements EventLookup<Object>{
         @Override
@@ -538,7 +529,9 @@ public class ActorEventService extends WithActorService implements EventService<
             if(subscriber!=null) {
                 synchronized (subscriber){
                     if (akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).subscribe(subscriber.unwrap(), topic)) {
-                        subscriber.topics().add(topic);
+                        try {
+                            subscriber.topics().add(topic);
+                        }catch (Exception e){}
                         return true;
                     }
                 }
@@ -551,7 +544,9 @@ public class ActorEventService extends WithActorService implements EventService<
             if(subscriber!=null) {
                 synchronized (subscriber){
                     if(akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).unsubscribe(subscriber.unwrap(), topic)){
-                        subscriber.topics().remove(topic);
+                        try {
+                            subscriber.topics().remove(topic);
+                        }catch (Exception e){}
                     }
                 }
             }
@@ -569,14 +564,6 @@ public class ActorEventService extends WithActorService implements EventService<
             return future(callable, futureHardContext);
         }
 
-        @Override
-        public void start() {
-
-        }
-        @Override
-        public void stop() {
-
-        }
     }
 
     class AkkaEventStream implements EventStream<Class>{

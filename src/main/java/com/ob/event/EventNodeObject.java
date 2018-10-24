@@ -4,6 +4,8 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -29,8 +31,8 @@ public interface EventNodeObject<T> extends EventNode<T>, EventScheduler {
         }
 
         @Override
-        public ObjectOpenHashSet topics() {
-            return null;
+        public Set topics() {
+            return Collections.EMPTY_SET;
         }
 
         @Override

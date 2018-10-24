@@ -7,18 +7,17 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
     private int eventConcurrency = 64;
     private int lookupConcurrency = 16;
     private int timeoutConcurrency = 64;
-    private int softSize = Runtime.getRuntime().availableProcessors();
     private int hardSize = 0;
     private int maxHardSize = Integer.MAX_VALUE;
     private long keepAliveTime = 60l;
-    private int lookUpConcurrency = 10;
+    private int lookupSize = 10;
 
-    public int getLookUpConcurrency() {
-        return lookUpConcurrency;
+    public int getLookupSize() {
+        return lookupSize;
     }
 
-    public void setLookUpConcurrency(int lookUpConcurrency) {
-        this.lookUpConcurrency = lookUpConcurrency;
+    public void setLookupSize(int lookupSize) {
+        this.lookupSize = lookupSize;
     }
 
     public int getUnionConcurrency() {
@@ -51,14 +50,6 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
 
     public void setTimeoutConcurrency(int timeoutConcurrency) {
         this.timeoutConcurrency = timeoutConcurrency;
-    }
-
-    public int getSoftSize() {
-        return softSize;
-    }
-
-    public void setSoftSize(int softSize) {
-        this.softSize = softSize;
     }
 
     public int getHardSize() {
