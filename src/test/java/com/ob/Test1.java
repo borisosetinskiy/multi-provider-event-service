@@ -1,14 +1,11 @@
 package com.ob;
 
-import com.ob.common.akka.ActorService;
-import com.ob.common.akka.ActorServiceImpl;
+import com.ob.event.akka.*;
 import com.ob.event.EventEnvelope;
 import com.ob.event.EventLogic;
 import com.ob.event.EventLogicFactory;
-import com.ob.event.EventNodeEndPoint;
-import com.ob.event.akka.ActorEventService;
-import com.ob.event.akka.AkkaEventLogic;
 
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -17,16 +14,16 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class Test1 {
     public static void main(String [] args)throws Exception{
-
-        ActorService actorService = new ActorServiceImpl("Test");
-        ActorEventService actorEventService = new ActorEventService();
-        actorEventService.setActorService(actorService);
+        ActorEventServiceBuilder actorEventServiceBuilder =  new ActorEventServiceBuilder();
+        actorEventServiceBuilder.getAkkaEventServiceConfig().setWithExtension(true);
+        actorEventServiceBuilder.getAkkaEventServiceConfig().setHasEventNodeScheduledService(true);
+        ActorEventService actorEventService =  actorEventServiceBuilder.build("Test", null);
         for(int i=0;i<10;++i){
             final String name =  "C" + i;
             actorEventService.create(name, "Consumer", new EventLogicFactory() {
                 @Override
                 public EventLogic create() {
-                    return new AkkaEventLogic(name) {
+                    return new AkkaEventLogicImpl(name) {
                         @Override
                         public void onEvent(Object event, Class clazz) {
                             System.out.println(name+event);
@@ -41,13 +38,18 @@ public class Test1 {
 
                         @Override
                         public void start() {
-                            this.getEventNodeObject().getEventService().subscribeLookup(getEventNodeObject(), "ToConsumer");
+                            this.getEventNodeObject().getEventService().getExtension().getEventLookup().subscribeLookup(getEventNodeObject(), "ToConsumer");
                             System.out.println("Start-"+name);
                         }
 
                         @Override
                         public void stop() {
                             System.out.println("Stop-"+name);
+                        }
+
+                        @Override
+                        public Map<String, Object> getOption() {
+                            return null;
                         }
 
                     };
@@ -60,7 +62,7 @@ public class Test1 {
             actorEventService.create(name, "Consumer2", new EventLogicFactory() {
                 @Override
                 public EventLogic create() {
-                    return new AkkaEventLogic(name) {
+                    return new AkkaEventLogicImpl(name) {
                         @Override
                         public void tellSync(Object event) {
 
@@ -74,13 +76,18 @@ public class Test1 {
 
                         @Override
                         public void start() {
-                            this.getEventNodeObject().getEventService().subscribeLookup(getEventNodeObject(), "ToConsumer2");
+                            this.getEventNodeObject().getEventService().getExtension().getEventLookup().subscribeLookup(getEventNodeObject(), "ToConsumer2");
                             System.out.println("Start-"+name);
                         }
 
                         @Override
                         public void stop() {
                             System.out.println("Stop-"+name);
+                        }
+
+                        @Override
+                        public Map<String, Object> getOption() {
+                            return null;
                         }
 
                     };
@@ -93,7 +100,7 @@ public class Test1 {
             actorEventService.create(name, "Producer", new EventLogicFactory() {
                 @Override
                 public EventLogic create() {
-                    return new AkkaEventLogic(name) {
+                    return new AkkaEventLogicImpl(name) {
                         @Override
                         public void tellSync(Object event) {
 
@@ -102,16 +109,12 @@ public class Test1 {
                         @Override
                         public void onEvent(Object event, Class clazz) {
                             final long id = counter.incrementAndGet();
-                            this.getEventNodeObject().getEventService().publishEvent(new EventEnvelope() {
+                            this.getEventNodeObject().getEventService().getExtension().getEventLookup().publishEvent(new EventEnvelope() {
                                 @Override
                                 public Object topic() {
                                     return "ToConsumer";
                                 }
 
-                                @Override
-                                public int getLookupId() {
-                                    return 0;
-                                }
 
                                 @Override
                                 public String toString() {
@@ -132,6 +135,11 @@ public class Test1 {
                         @Override
                         public void stop() {
                             System.out.println("Stop-"+name);
+                        }
+
+                        @Override
+                        public Map<String, Object> getOption() {
+                            return null;
                         }
 
 

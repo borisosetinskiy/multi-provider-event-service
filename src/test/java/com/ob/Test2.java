@@ -1,23 +1,22 @@
 package com.ob;
 
-import com.ob.common.akka.ActorService;
-import com.ob.common.akka.ActorServiceImpl;
+import com.ob.event.akka.*;
 import com.ob.event.EventEnvelope;
 import com.ob.event.EventLogic;
 import com.ob.event.EventLogicFactory;
-import com.ob.event.akka.ActorEventService;
-import com.ob.event.akka.AkkaEventLogic;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Test2 {
     public static void main(String [] args)throws Exception{
-        ActorService actorService = new ActorServiceImpl("Test");
-        ActorEventService actorEventService = new ActorEventService();
-        actorEventService.setActorService(actorService);
+        ActorEventServiceBuilder actorEventServiceBuilder =  new ActorEventServiceBuilder();
+        actorEventServiceBuilder.getAkkaEventServiceConfig().setWithExtension(true);
+        actorEventServiceBuilder.getAkkaEventServiceConfig().setHasEventNodeScheduledService(true);
+        ActorEventService actorEventService =  actorEventServiceBuilder.build("Test", null);
         List<String> topics = Arrays.asList("EUR/USD", "USD/JPY", "GBP/USD");
         final Producer producer = new Producer("producer",topics);
         actorEventService.create("producer", "producer", new EventLogicFactory() {
@@ -88,7 +87,7 @@ public class Test2 {
         System.in.read();
     }
 }
-class Producer extends AkkaEventLogic{
+class Producer extends AkkaEventLogicImpl {
 
     AtomicLong counter = new AtomicLong();
     final List<String> topics;
@@ -99,7 +98,7 @@ class Producer extends AkkaEventLogic{
 
     @Override
     public void start() {
-        getService().scheduledEvent(getEventNodeObject(), getEventNodeObject(), Produce.i, TimeUnit.SECONDS, 1);
+        getService().getExtension().getEventNodeScheduledService().scheduledEvent(getEventNodeObject(), getEventNodeObject(), Produce.i, TimeUnit.SECONDS, 1);
     }
 
     @Override
@@ -108,11 +107,16 @@ class Producer extends AkkaEventLogic{
     }
 
     @Override
+    public Map<String, Object> getOption() {
+        return null;
+    }
+
+    @Override
     public void onEvent(Object event, Class clazz) {
         if(event instanceof Produce){
             for(String topic :topics){
                 String value = topic+counter.incrementAndGet();
-                getService().publishEvent(new Msg(topic, value));
+                getService().getExtension().getEventLookup().publishEvent(new Msg(topic, value));
                 System.out.println(String.format("Producer sent %s",value));
             }
         }
@@ -139,16 +143,12 @@ final class Msg implements EventEnvelope<String> {
         return topic;
     }
 
-    @Override
-    public int getLookupId() {
-        return 0;
-    }
 
     public String getValue() {
         return value;
     }
 }
-class Consumer extends AkkaEventLogic{
+class Consumer extends AkkaEventLogicImpl {
 
     final String topic;
     protected Consumer(String name, String topic) {
@@ -158,12 +158,17 @@ class Consumer extends AkkaEventLogic{
 
     @Override
     public void start() {
-        getService().subscribeLookup(getEventNodeObject(), topic);
+        getService().getExtension().getEventLookup().subscribeLookup(getEventNodeObject(), topic);
     }
 
     @Override
     public void stop() {
 
+    }
+
+    @Override
+    public Map<String, Object> getOption() {
+        return null;
     }
 
     @Override

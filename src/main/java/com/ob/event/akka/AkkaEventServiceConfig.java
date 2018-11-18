@@ -10,7 +10,35 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
     private int hardSize = 0;
     private int maxHardSize = Integer.MAX_VALUE;
     private long keepAliveTime = 60l;
-    private int lookupSize = 10;
+    private int lookupSize = 5;
+    private boolean withExtension;
+    private boolean hasEventTimeoutService;
+    private boolean hasEventNodeRouterService;
+    private boolean hasEventNodeScheduledService;
+
+    public boolean isHasEventTimeoutService() {
+        return hasEventTimeoutService;
+    }
+
+    public void setHasEventTimeoutService(boolean hasEventTimeoutService) {
+        this.hasEventTimeoutService = hasEventTimeoutService;
+    }
+
+    public boolean isHasEventNodeRouterService() {
+        return hasEventNodeRouterService;
+    }
+
+    public void setHasEventNodeRouterService(boolean hasEventNodeRouterService) {
+        this.hasEventNodeRouterService = hasEventNodeRouterService;
+    }
+
+    public boolean isHasEventNodeScheduledService() {
+        return hasEventNodeScheduledService;
+    }
+
+    public void setHasEventNodeScheduledService(boolean hasEventNodeScheduledService) {
+        this.hasEventNodeScheduledService = hasEventNodeScheduledService;
+    }
 
     public int getLookupSize() {
         return lookupSize;
@@ -76,5 +104,11 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
         this.keepAliveTime = keepAliveTime;
     }
 
-    public static final AkkaEventServiceConfig DEFAULT_AKKA_EVENT_SERVICE_CONFIG = new AkkaEventServiceConfig();
+    public boolean isWithExtension() {
+        return withExtension;
+    }
+
+    public void setWithExtension(boolean withExtension) {
+        this.withExtension = withExtension;
+    }
 }

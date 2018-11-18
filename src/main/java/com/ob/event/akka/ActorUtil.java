@@ -1,7 +1,8 @@
-package com.ob.common.akka;
+package com.ob.event.akka;
 
 import akka.actor.ActorRef;
 import akka.pattern.Patterns;
+import com.ob.event.EventNode;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.FiniteDuration;
@@ -31,5 +32,9 @@ public final class ActorUtil {
 				  , FD10);
 	      // the actor has been stopped
 	    } catch(Exception e) { }
+	}
+
+	public static ActorRef sender(EventNode<ActorRef> sender){
+		return (sender==null)?ActorRef.noSender():sender.unwrap();
 	}
 }
