@@ -7,14 +7,14 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
     private int eventConcurrency = 64;
     private int lookupConcurrency = 16;
     private int timeoutConcurrency = 64;
-    private int hardSize = 0;
-    private int maxHardSize = Integer.MAX_VALUE;
-    private long keepAliveTime = 60l;
     private int lookupSize = 5;
     private boolean withExtension;
     private boolean hasEventTimeoutService;
     private boolean hasEventNodeRouterService;
     private boolean hasEventNodeScheduledService;
+
+
+
 
     public boolean isHasEventTimeoutService() {
         return hasEventTimeoutService;
@@ -78,30 +78,6 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
 
     public void setTimeoutConcurrency(int timeoutConcurrency) {
         this.timeoutConcurrency = timeoutConcurrency;
-    }
-
-    public int getHardSize() {
-        return hardSize;
-    }
-
-    public void setHardSize(int hardSize) {
-        this.hardSize = hardSize;
-    }
-
-    public int getMaxHardSize() {
-        return maxHardSize;
-    }
-
-    public void setMaxHardSize(int maxHardSize) {
-        this.maxHardSize = maxHardSize;
-    }
-
-    public long getKeepAliveTime() {
-        return keepAliveTime;
-    }
-
-    public void setKeepAliveTime(long keepAliveTime) {
-        this.keepAliveTime = keepAliveTime;
     }
 
     public boolean isWithExtension() {

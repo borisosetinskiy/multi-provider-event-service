@@ -3,7 +3,9 @@ package com.ob.event.akka;
 import com.ob.event.EventLogic;
 import com.ob.event.EventNode;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 public class AkkaWrapperEventLogic implements AkkaEventLogic {
     private final EventLogic eventLogic;
@@ -35,8 +37,8 @@ public class AkkaWrapperEventLogic implements AkkaEventLogic {
     }
 
     @Override
-    public Class[] getMatchers() {
-        return (Class[])eventLogic.getOption().getOrDefault(AkkaEventLogic.OPTION_MATCHER, AkkaEventLogic.EMPTY);
+    public Set<Class> getMatchers() {
+        return (Set<Class>)eventLogic.getOption().getOrDefault(AkkaEventLogic.OPTION_MATCHER, Collections.EMPTY_SET);
     }
 
     @Override

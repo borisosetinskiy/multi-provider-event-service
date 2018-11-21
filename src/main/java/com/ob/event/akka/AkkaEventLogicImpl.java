@@ -2,6 +2,9 @@ package com.ob.event.akka;
 
 import com.ob.event.*;
 
+import java.util.Collections;
+import java.util.Set;
+
 /**
  * Created by boris on 1/30/2017.
  */
@@ -68,10 +71,9 @@ public  abstract class AkkaEventLogicImpl implements AkkaEventLogic {
         return withMailbox;
     }
 
-    static final Class[] EMPTY = new Class[0];
     @Override
-    public Class[] getMatchers() {
-        return EMPTY;
+    public Set<Class> getMatchers() {
+        return Collections.EMPTY_SET;
     }
 
 }

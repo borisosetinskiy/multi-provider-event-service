@@ -9,10 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
+import scala.concurrent.impl.Promise;
 
 import javax.annotation.PostConstruct;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -57,10 +59,13 @@ public class ActorEventService implements EventService<Future> {
     }
 
 
-    public ActorEventService(String name, ActorService actorService, AkkaEventServiceConfig akkaEventServiceConfig, ExecutionContext executionContext) {
+    public ActorEventService(String name, ActorService actorService
+            , AkkaEventServiceConfig akkaEventServiceConfig
+            , ExecutionContext executionContext) {
         this.name = name;
         this.actorService = actorService;
-        this.akkaExecutableContext = new AkkaExecutableContext(executionContext);
+        if(executionContext != null)
+            this.akkaExecutableContext = new AkkaExecutableContext(executionContext);
         this.unions = new ConcurrentHashMap<>(akkaEventServiceConfig.getUnionConcurrency(), 0.75f, akkaEventServiceConfig.getUnionConcurrency());
         this.eventNodes = new ConcurrentHashMap<>(akkaEventServiceConfig.getEventConcurrency(), 0.75f, akkaEventServiceConfig.getEventConcurrency());
         if (akkaEventServiceConfig.isWithExtension())
@@ -284,6 +289,7 @@ public class ActorEventService implements EventService<Future> {
 
     @Override
     public Future<EventNode> createAsync(String name, String unionId, EventLogicFactory eventLogicFactory) {
+        Objects.requireNonNull(akkaExecutableContext, "akkaExecutableContext is null. Don't use this method.");
         return akkaExecutableContext.execute(() -> create(name, unionId, eventLogicFactory));
     }
 

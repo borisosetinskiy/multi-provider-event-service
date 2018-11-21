@@ -38,7 +38,7 @@ public class AkkaActor extends AbstractActor {
     @Override
     public Receive createReceive() {
         final ReceiveBuilder receiveBuilder = receiveBuilder();
-        if(logic.getMatchers().length == 0){
+        if(logic.getMatchers().isEmpty()){
             receiveBuilder.matchAny(message -> {
                 try {
                     logic.onEvent(message, null);
@@ -50,6 +50,7 @@ public class AkkaActor extends AbstractActor {
                     try {
                         logic.onEvent(message, clazz);
                     }catch (Exception e){}
+                    return;
                 });
             }
         }
