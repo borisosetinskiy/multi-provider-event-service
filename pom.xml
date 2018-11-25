@@ -3,8 +3,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.ob</groupId>
-  <artifactId>multi-provider-event-service</artifactId>
-  <version>1.0.53</version>
+  <artifactId>multi-provider-event-api</artifactId>
+  <version>1.0.54</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

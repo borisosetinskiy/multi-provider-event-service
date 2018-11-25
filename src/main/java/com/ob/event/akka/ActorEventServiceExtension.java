@@ -35,7 +35,7 @@ public class ActorEventServiceExtension implements EventServiceExtension<Object>
             akkaEventTimeoutService = Optional.of(akkaEventTimeoutService1);
             actorEventService.create(akkaEventTimeoutService1.name()
                     , akkaEventTimeoutService1.name()
-                    , (EventLogicFactory<AkkaEventOption>) biFunction -> biFunction.apply(akkaEventTimeoutService1, new AkkaEventOption() {}));
+                    , () -> akkaEventTimeoutService1);
 
         }
         if (akkaEventServiceConfig.isWithEventNodeRouterService())
@@ -151,6 +151,10 @@ public class ActorEventServiceExtension implements EventServiceExtension<Object>
                     .setNameFormat(name() + "-%d").build());
         }
 
+        @Override
+        public EventLogicOption getEventLogicOption(){
+            return new AkkaEventLogicOption(){};
+        }
         @Override
         public Future tellEvent(Object id, EventNode recipient, Object event
                 , int timeout, EventListener eventListener) {

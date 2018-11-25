@@ -7,6 +7,7 @@ public interface EventLogic extends EventNodeListener, OnEventNode, EventNodeEnd
         , EventNodeSyncEndPoint {
     default void preStart(){}
     default void preStop(){}
+    default EventLogicOption getEventLogicOption(){return EventLogicOption.EMPTY;}
     EventLogic EMPTY = new EventLogic() {
         @Override
         public String name() {

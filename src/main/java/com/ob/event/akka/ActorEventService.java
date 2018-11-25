@@ -9,7 +9,6 @@ import scala.concurrent.Future;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
 
 import static akka.dispatch.Futures.future;
 import static com.ob.event.akka.ActorUtil.sender;
@@ -174,10 +173,7 @@ public class ActorEventService implements EventService<Future, Class> {
             final AkkaEventLogicObject eventLogic;
             private ActorRef actor;
             {
-                eventLogic = (AkkaEventLogicObject) eventLogicFactory.create(
-                        (BiFunction<EventLogic, AkkaEventOption, EventLogic>)
-                                (eventLogic, eventOption) ->
-                                        new AkkaEventLogicObject(eventLogic, eventOption));
+                eventLogic = new AkkaEventLogicObject( eventLogicFactory.create());
                 Props props = AkkaActor.props(this);
                 if (eventLogic.withDispatcher() != null)
                     props = props.withDispatcher(eventLogic.withDispatcher());

@@ -6,13 +6,13 @@ import com.ob.event.EventNodeObject;
 
 import java.util.Set;
 
-public class AkkaEventLogicObject implements EventLogic, AkkaEventOption {
+public class AkkaEventLogicObject implements EventLogic, AkkaEventLogicOption {
     private final EventLogic eventLogic;
-    private final AkkaEventOption eventOption;
+    private final AkkaEventLogicOption eventOption;
     public AkkaEventLogicObject(EventLogic eventLogic
-            , AkkaEventOption eventOption) {
+            ) {
         this.eventLogic = eventLogic;
-        this.eventOption = eventOption;
+        this.eventOption = (AkkaEventLogicOption)eventLogic.getEventLogicOption();
     }
     @Override
     public void preStart() {
