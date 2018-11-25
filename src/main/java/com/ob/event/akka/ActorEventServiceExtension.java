@@ -13,46 +13,39 @@ import scala.concurrent.duration.FiniteDuration;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 
-
-import static com.ob.event.akka.ActorUtil.sender;
-
-public class ActorEventServiceExtension implements EventServiceExtension<Future, Class, Object> {
+public class ActorEventServiceExtension implements EventServiceExtension<Object> {
     private static final Logger logger = LoggerFactory.getLogger(ActorEventServiceExtension.class);
-    private Map<Integer, ILookup> akkaLookups;
-    private AkkaEventTimeoutService akkaEventTimeoutService;
-    private AkkaEventStream akkaEventStream;
-    private AkkaEventLookup akkaEventLookup;
-    private AkkaEventNodeRouterService akkaEventNodeRouterService;
-    private AkkaEventNodeScheduledService akkaEventNodeScheduledService;
+
+    private Optional<EventTimeoutService> akkaEventTimeoutService;
+    private EventLookup<Object>  akkaEventLookup;
+    private Optional<EventNodeRouterService> akkaEventNodeRouterService;
+    private Optional<EventNodeScheduledService> akkaEventNodeScheduledService;
     private final ActorEventService actorEventService;
-    private final int lookupSize;
+
 
     protected ActorEventServiceExtension(ActorEventService actorEventService, AkkaEventServiceConfig akkaEventServiceConfig) {
         this.actorEventService = actorEventService;
-        this.akkaLookups = new ConcurrentHashMap<>(akkaEventServiceConfig.getLookupConcurrency(), 0.75f, akkaEventServiceConfig.getLookupConcurrency());
-        akkaEventStream = new AkkaEventStream();
-        akkaEventLookup = new AkkaEventLookup();
-        lookupSize = akkaEventServiceConfig.getLookupSize();
-        if (akkaEventServiceConfig.isHasEventTimeoutService())
-            akkaEventTimeoutService = new AkkaEventTimeoutService(akkaEventServiceConfig.getTimeoutConcurrency());
+        akkaEventLookup = new AkkaEventLookup(akkaEventServiceConfig.getLookupSize());
+        if (akkaEventServiceConfig.isWithEventTimeoutService()) {
+            AkkaEventTimeoutService akkaEventTimeoutService1 = new AkkaEventTimeoutService();
+            akkaEventTimeoutService = Optional.of(akkaEventTimeoutService1);
+            actorEventService.create(akkaEventTimeoutService1.name()
+                    , akkaEventTimeoutService1.name()
+                    , (EventLogicFactory<AkkaEventOption>) biFunction -> biFunction.apply(akkaEventTimeoutService1, new AkkaEventOption() {}));
 
-        if (akkaEventServiceConfig.isHasEventNodeRouterService())
-            akkaEventNodeRouterService = new AkkaEventNodeRouterService();
-
-        if (akkaEventServiceConfig.isHasEventNodeScheduledService())
-            akkaEventNodeScheduledService = new AkkaEventNodeScheduledService();
-
+        }
+        if (akkaEventServiceConfig.isWithEventNodeRouterService())
+            akkaEventNodeRouterService = Optional.of(new AkkaEventNodeRouterService());
+        if (akkaEventServiceConfig.isWithEventNodeScheduledService())
+            akkaEventNodeScheduledService = Optional.of(new AkkaEventNodeScheduledService());
     }
 
 
-    @Override
-    public EventStream<Class> getEventStream() {
-        return akkaEventStream;
-    }
+
 
     @Override
     public EventLookup<Object> getEventLookup() {
@@ -60,61 +53,43 @@ public class ActorEventServiceExtension implements EventServiceExtension<Future,
     }
 
     @Override
-    public EventTimeoutService getEventTimeoutService() {
-        if (!hasEventTimeoutService()) throw new RuntimeException("no TimeoutService");
+    public Optional<EventTimeoutService> getEventTimeoutService() {
         return akkaEventTimeoutService;
     }
 
 
     @Override
-    public EventNodeRouterService getEventNodeRouterService() {
-        if (!hasEventNodeRouterService()) throw new RuntimeException("no RouterService");
+    public Optional<EventNodeRouterService> getEventNodeRouterService() {
         return akkaEventNodeRouterService;
     }
 
     @Override
-    public EventNodeScheduledService getEventNodeScheduledService() {
-        if (!hasEventNodeScheduledService()) throw new RuntimeException("no ScheduledService");
+    public Optional<EventNodeScheduledService> getEventNodeScheduledService() {
         return akkaEventNodeScheduledService;
     }
 
-    @Override
-    public boolean hasEventTimeoutService() {
-        return akkaEventTimeoutService != null;
-    }
 
-    @Override
-    public boolean hasEventNodeRouterService() {
-        return akkaEventNodeRouterService != null;
-    }
-
-    @Override
-    public boolean hasEventNodeScheduledService() {
-        return akkaEventNodeScheduledService != null;
-    }
 
 
     class AkkaEventNodeScheduledService implements EventNodeScheduledService {
-        void scheduledEvent0(ActorRef sender, ActorRef recipient, Object event, TimeUnit tu, int time) {
-            if (recipient != null && !recipient.isTerminated()) {
+        void scheduledEvent0(ActorRef recipient, Object event, TimeUnit tu, int time) {
+            if (recipient != null) {
                 actorEventService.getActorService().getActorSystem().scheduler().schedule(
                         Duration.Zero(), new FiniteDuration(time, tu), recipient, event,
-                        actorEventService.getActorService().getActorSystem().dispatcher(), sender
+                        actorEventService.getActorService().getActorSystem().dispatcher(), recipient
                 );
             }
         }
 
-
         @Override
-        public void scheduledEvent(EventNode sender, EventNode recipient, Object event, TimeUnit tu, int time) {
+        public void scheduledEvent(EventNode recipient, Object event, TimeUnit tu, int time){
             ActorRef recipient0 = (ActorRef) recipient.unwrap();
-            scheduledEvent0(sender(sender), recipient0, event, tu, time);
+            scheduledEvent0(recipient0, event, tu, time);
         }
-
         @Override
-        public void scheduledEvent(EventNode sender, String recipient, Object event, TimeUnit tu, int time) {
+        public void scheduledEvent(String recipient, Object event, TimeUnit tu, int time){
             ActorRef recipient0 = actorEventService.getActorService().getActorSystem().actorFor(recipient);
-            scheduledEvent0(sender(sender), recipient0, event, tu, time);
+            scheduledEvent0(recipient0, event, tu, time);
         }
     }
 
@@ -167,95 +142,14 @@ public class ActorEventServiceExtension implements EventServiceExtension<Future,
             };
         }
     }
-
-    int toLockupId(int hash) {
-        return hash % lookupSize;
-    }
-
-    class AkkaEventLookup implements EventLookup<Object> {
-        @Override
-        public boolean subscribeLookup(EventNode subscriber, Object topic) {
-            return subscribeLookup(toLockupId(topic.hashCode()), subscriber, topic);
-        }
-
-        @Override
-        public void removeLookup(EventNode subscriber, Object topic) {
-            removeLookup(toLockupId(topic.hashCode()), subscriber, topic);
-        }
-
-        @Override
-        public void publishEvent(EventEnvelope<Object> event) {
-            publishEvent(toLockupId(event.topic().hashCode()), event);
-        }
-
-        @Override
-        public boolean subscribeLookup(int lookupId, EventNode subscriber, Object topic) {
-            if (subscriber != null) {
-                synchronized (subscriber) {
-                    if (akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).subscribe(subscriber.unwrap(), topic)) {
-                        try {
-                            subscriber.topics().add(topic);
-                        } catch (Exception e) {
-                        }
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public void removeLookup(int lookupId, EventNode subscriber, Object topic) {
-            if (subscriber != null) {
-                synchronized (subscriber) {
-                    if (akkaLookups.computeIfAbsent(lookupId, (Function<Integer, AkkaLookup>) integer -> new AkkaLookup()).unsubscribe(subscriber.unwrap(), topic)) {
-                        try {
-                            subscriber.topics().remove(topic);
-                        } catch (Exception e) {
-                        }
-                    }
-                }
-            }
-        }
-
-        @Override
-        public void publishEvent(int lookupId, EventEnvelope<Object> event) {
-            akkaLookups.getOrDefault(lookupId, ILookup.EMPTY).publish(event);
-        }
-    }
-
-
-    class AkkaEventStream implements EventStream<Class> {
-        /*Unblocked method*/
-        @Override
-        public void publishStream(Object event) {
-            actorEventService.getActorService().getActorSystem().eventStream().publish(event);
-        }
-
-        /*Unblocked method*/
-        @Override
-        public void subscribeStream(EventNode subscriber, Class event) {
-            actorEventService.getActorService().getActorSystem().eventStream().subscribe((ActorRef) subscriber.unwrap(), event);
-        }
-
-        /*Unblocked method*/
-        @Override
-        public void removeStream(EventNode subscriber, Class event) {
-            actorEventService.getActorService().getActorSystem().eventStream().unsubscribe((ActorRef) subscriber.unwrap(), event);
-        }
-    }
-
-    class AkkaEventTimeoutService extends AkkaEventLogicImpl implements EventTimeoutService {
+    class AkkaEventTimeoutService  implements EventLogic, EventTimeoutService {
         private ScheduledExecutorService scheduler;
-        private Map<Object, EventTimeout> events;
-
-        protected AkkaEventTimeoutService(int concurrencyLevel) {
-            super("EVENT_TIMEOUT");
-            events = new ConcurrentHashMap(0, 0.75f, concurrencyLevel);
+        private EventNodeObject eventNodeObject;
+        private Map<Object, EventTimeout> events = new ConcurrentHashMap();
+        protected AkkaEventTimeoutService() {
             scheduler = Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().setDaemon(true)
                     .setNameFormat(name() + "-%d").build());
         }
-
 
         @Override
         public Future tellEvent(Object id, EventNode recipient, Object event
@@ -267,7 +161,7 @@ public class ActorEventServiceExtension implements EventServiceExtension<Future,
             if (id == null)
                 throw new RuntimeException("Id can't be null");
             long time = System.currentTimeMillis();
-            return actorEventService.getExecutableContext().execute((Callable<Object>) () -> events.computeIfAbsent(id, o -> {
+            return actorEventService.getExecutableContext().get().execute((Callable<Object>) () -> events.computeIfAbsent(id, o -> {
                 final EventTimeout eventTimeout = new EventTimeout() {
                     private AtomicBoolean canceled = new AtomicBoolean();
                     private EventCallback callback = new EventCallback() {
@@ -305,7 +199,7 @@ public class ActorEventServiceExtension implements EventServiceExtension<Future,
                         return callback;
                     }
                 };
-                actorEventService.tellEvent(getEventNodeObject(), recipient
+                actorEventService.tellEvent(eventNodeObject, recipient
                         , eventTimeout.eventCallback());
                 return eventTimeout;
             }));
@@ -313,7 +207,7 @@ public class ActorEventServiceExtension implements EventServiceExtension<Future,
 
 
         @Override
-        public void start() {
+        public void preStart() {
             scheduler.scheduleWithFixedDelay(() -> {
                 for (EventTimeout eventTimeout : events.values()) {
                     try {
@@ -326,12 +220,21 @@ public class ActorEventServiceExtension implements EventServiceExtension<Future,
         }
 
         @Override
-        public void stop() {
+        public void preStop() {
             if (!scheduler.isShutdown())
                 scheduler.shutdown();
             logger.info("Timeout service stopped...");
         }
 
 
+        @Override
+        public String name() {
+            return "TIME_OUT_SERVICE";
+        }
+
+        @Override
+        public void onEventNode(EventNodeObject eventNodeObject) {
+           this.eventNodeObject = eventNodeObject;
+        }
     }
 }

@@ -2,25 +2,14 @@ package com.ob.event.akka;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import com.google.common.collect.Sets;
-
 import com.ob.event.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
-import scala.concurrent.impl.Promise;
 
-import javax.annotation.PostConstruct;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
+import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiFunction;
 
 import static akka.dispatch.Futures.future;
 import static com.ob.event.akka.ActorUtil.sender;
@@ -29,15 +18,15 @@ import static com.ob.event.akka.ActorUtil.sender;
 /**
  * Created by boris on 1/28/2017.
  */
-public class ActorEventService implements EventService<Future> {
-    private static final Logger logger = LoggerFactory.getLogger(ActorEventService.class);
-
-    private Map<String, EventNodeUnion> unions;
-    private Map<String, EventNode> eventNodes;
+public class ActorEventService implements EventService<Future, Class> {
+    private final Map<String, EventNodeUnion> unions;
+    private final Map<String, EventNode> eventNodes;
     private final String name;
     private final ActorService actorService;
-    private AkkaExecutableContext akkaExecutableContext;
-    private ActorEventServiceExtension eventServiceExtension;
+    private final Optional<EventStream<Class>> akkaEventStream;
+    private final Optional<ExecutableContext<Future>> akkaExecutableContext;
+    private final Optional<EventServiceExtension> eventServiceExtension;
+    private final Optional<EventService> self;
 
     String getName() {
         return name;
@@ -47,14 +36,18 @@ public class ActorEventService implements EventService<Future> {
         return actorService;
     }
 
+    @Override
+    public Optional<EventStream<Class>> getEventStream() {
+        return akkaEventStream;
+    }
 
     @Override
-    public ExecutableContext<Future> getExecutableContext() {
+    public Optional<ExecutableContext<Future>> getExecutableContext() {
         return akkaExecutableContext;
     }
 
     @Override
-    public EventServiceExtension getExtension() {
+    public Optional<EventServiceExtension> getExtension() {
         return eventServiceExtension;
     }
 
@@ -64,22 +57,40 @@ public class ActorEventService implements EventService<Future> {
             , ExecutionContext executionContext) {
         this.name = name;
         this.actorService = actorService;
-        if(executionContext != null)
-            this.akkaExecutableContext = new AkkaExecutableContext(executionContext);
-        this.unions = new ConcurrentHashMap<>(akkaEventServiceConfig.getUnionConcurrency(), 0.75f, akkaEventServiceConfig.getUnionConcurrency());
-        this.eventNodes = new ConcurrentHashMap<>(akkaEventServiceConfig.getEventConcurrency(), 0.75f, akkaEventServiceConfig.getEventConcurrency());
+        if (executionContext != null)
+            this.akkaExecutableContext = Optional.of(new AkkaExecutableContext(executionContext));
+        else
+            this.akkaExecutableContext = Optional.empty();
+        this.unions = new ConcurrentHashMap<>();
+        this.eventNodes = new ConcurrentHashMap<>();
+        this.akkaEventStream = Optional.of(new AkkaEventStream());
         if (akkaEventServiceConfig.isWithExtension())
-            this.eventServiceExtension = new ActorEventServiceExtension(this, akkaEventServiceConfig);
+            this.eventServiceExtension = Optional.of(new ActorEventServiceExtension(this, akkaEventServiceConfig));
+        else
+            this.eventServiceExtension = Optional.empty();
+        this.self = Optional.of(this);
     }
 
-    @Override
-    @PostConstruct
-    public void start() {
-        if (eventServiceExtension != null && eventServiceExtension.hasEventTimeoutService()) {
-            create(eventServiceExtension.getEventTimeoutService().name()
-                    , eventServiceExtension.getEventTimeoutService().name(), () -> (EventLogic) eventServiceExtension);
+    class AkkaEventStream implements EventStream<Class> {
+        /*Unblocked method*/
+        @Override
+        public void publishStream(Object event) {
+            getActorService().getActorSystem().eventStream().publish(event);
+        }
+
+        /*Unblocked method*/
+        @Override
+        public void subscribeStream(EventNode subscriber, Class event) {
+            getActorService().getActorSystem().eventStream().subscribe((ActorRef) subscriber.unwrap(), event);
+        }
+
+        /*Unblocked method*/
+        @Override
+        public void removeStream(EventNode subscriber, Class event) {
+            getActorService().getActorSystem().eventStream().unsubscribe((ActorRef) subscriber.unwrap(), event);
         }
     }
+
 
     public Map<String, EventNodeUnion> getUnions() {
         return unions;
@@ -103,11 +114,9 @@ public class ActorEventService implements EventService<Future> {
         actorService.getActorSystem().actorSelection(recipient).tell(event, sender(sender));
     }
 
-
     EventNodeUnion createEventNodeUnion(String unionName) {
         return new EventNodeUnion() {
             Map<String, EventNode> nodes = new ConcurrentHashMap<>();
-            private AtomicLong nodeSize = new AtomicLong();
 
             @Override
             public void tell(Object event, EventNode sender) {
@@ -128,39 +137,30 @@ public class ActorEventService implements EventService<Future> {
 
             @Override
             public void add(EventNode value) {
-                nodes.computeIfAbsent(value.name(), new Function<String, EventNode>() {
-                    @Override
-                    public EventNode apply(String s) {
-                        nodeSize.incrementAndGet();
-                        return value;
-                    }
-                });
-
+                nodes.put(value.name(), value);
             }
 
             @Override
             public void remove(EventNode value) {
-                if (nodes.remove(value.name()) != null)
-                    nodeSize.decrementAndGet();
+                nodes.remove(value.name());
             }
 
             @Override
             public Collection<EventNode> all() {
-                return nodes.values();
-            }
-
-            @Override
-            public boolean isEmpty() {
-                return nodeSize.get() == 0;
+                return Collections.unmodifiableCollection(nodes.values());
             }
 
             @Override
             public void release() {
-                for (EventNode node : all()) {
-                    node.release();
+                EventNode eventNode;
+                for (String key : nodes.keySet()) {
+                    if ((eventNode = nodes.remove(key)) != null) {
+                        try {
+                            eventNode.release();
+                        } catch (Exception ignored) {
+                        }
+                    }
                 }
-                nodes.clear();
-                nodeSize.set(0);
                 unions.remove(unionName);
             }
         };
@@ -169,36 +169,44 @@ public class ActorEventService implements EventService<Future> {
 
     EventNodeObject<ActorRef> createEventNodeObject(final String name, String unionName
             , final EventLogicFactory eventLogicFactory) {
-        return new EventNodeObject<ActorRef>() {
-            final Set topics = Sets.newConcurrentHashSet();
-            final AkkaEventLogic eventLogic = (AkkaEventLogic) eventLogicFactory.create();
+        return new AkkaEventNodeObject() {
+
+            final AkkaEventLogicObject eventLogic;
             private ActorRef actor;
-            Lock actorLock = new ReentrantLock();
-
             {
+                eventLogic = (AkkaEventLogicObject) eventLogicFactory.create(
+                        (BiFunction<EventLogic, AkkaEventOption, EventLogic>)
+                                (eventLogic, eventOption) ->
+                                        new AkkaEventLogicObject(eventLogic, eventOption));
+                Props props = AkkaActor.props(this);
+                if (eventLogic.withDispatcher() != null)
+                    props = props.withDispatcher(eventLogic.withDispatcher());
+                if (eventLogic.withMailbox() != null)
+                    props = props.withMailbox(eventLogic.withMailbox());
+                actorService.getActorSystem().actorOf(props, name);
+            }
+
+            @Override
+            public Set<Class> getMatchers() {
+                return eventLogic.getMatchers();
+            }
+
+            @Override
+            public void preStart(ActorRef actor) {
+                this.actor = actor;
                 eventLogic.onEventNode(this);
-                actor();
+                eventLogic.preStart();
             }
 
-            ActorRef actor() {
-                if (actor == null) {
-                    actorLock.lock();
-                    try {
-                        if (actor == null) {
-                            Props props = AkkaActor.props(eventLogic);
-                            if (eventLogic.withDispatcher() != null)
-                                props = props.withDispatcher(eventLogic.withDispatcher());
-                            if (eventLogic.withMailbox() != null)
-                                props = props.withMailbox(eventLogic.withMailbox());
-                            actor = actorService.getActorSystem().actorOf(props, name);
-                        }
-                    } finally {
-                        actorLock.unlock();
-                    }
-                }
-                return actor;
+            @Override
+            public void preStop() {
+                eventLogic.preStop();
             }
 
+            @Override
+            public void onEvent(Object event, Class clazz) {
+                eventLogic.onEvent(event, clazz);
+            }
 
             @Override
             public String union() {
@@ -210,17 +218,9 @@ public class ActorEventService implements EventService<Future> {
                 return name;
             }
 
-            /*Unblocked method*/
-            @Override
-            public void scheduledEvent(final Object event, final TimeUnit tu, final int time) {
-                if (getExtension() != null)
-                    getExtension().getEventNodeScheduledService()
-                            .scheduledEvent(null, this, event, tu, time);
-            }
-
             @Override
             public ActorRef unwrap() {
-                return actor();
+                return actor;
             }
 
             @Override
@@ -229,31 +229,24 @@ public class ActorEventService implements EventService<Future> {
             }
 
             @Override
-            public EventService getEventService() {
-                return ActorEventService.this;
+            public Optional<EventService> getEventService() {
+                return self;
             }
-
-            @Override
-            public Set topics() {
-                return topics;
-            }
-
 
             @Override
             public void release() {
                 try {
-                    topics.clear();
                     eventNodes.remove(name);
                     EventNodeUnion eventNodeUnion = unions.get(unionName);
                     if (eventNodeUnion != null) {
                         eventNodeUnion.remove(this);
                     }
-                    //eventNodeGroupService.removeGroups(name);
                 } catch (Exception e) {
                 } finally {
                     try {
-                        ActorUtil.gracefulReadyStop(actor());
-                    } catch (Exception e0) {
+                        if (actor != null)
+                            ActorUtil.gracefulReadyStop(actor);
+                    } catch (Exception ignored) {
                     }
                 }
             }
@@ -271,9 +264,8 @@ public class ActorEventService implements EventService<Future> {
 
             @Override
             public String toString() {
-                return "[" + eventLogic +
-                        ", " + actor +
-                        ']';
+                return eventLogic +
+                        " - " + actor;
             }
         };
     }
@@ -289,8 +281,8 @@ public class ActorEventService implements EventService<Future> {
 
     @Override
     public Future<EventNode> createAsync(String name, String unionId, EventLogicFactory eventLogicFactory) {
-        Objects.requireNonNull(akkaExecutableContext, "akkaExecutableContext is null. Don't use this method.");
-        return akkaExecutableContext.execute(() -> create(name, unionId, eventLogicFactory));
+        Objects.requireNonNull(akkaExecutableContext.get(), "akkaExecutableContext is null. Don't use this method.");
+        return akkaExecutableContext.get().execute(() -> create(name, unionId, eventLogicFactory));
     }
 
 
@@ -308,13 +300,6 @@ public class ActorEventService implements EventService<Future> {
     public EventNodeUnion getUnion(String unionName) {
         return unions.getOrDefault(unionName, EventNodeUnion.EMPTY);
     }
-
-
-    @Override
-    public Collection<EventNode> getEventNodes() {
-        return eventNodes.values();
-    }
-
 
     class AkkaExecutableContext implements ExecutableContext<Future> {
         private final ExecutionContext executionContext;

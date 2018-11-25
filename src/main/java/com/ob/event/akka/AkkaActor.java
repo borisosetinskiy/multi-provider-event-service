@@ -4,51 +4,49 @@ import akka.actor.AbstractActor;
 import akka.actor.Props;
 import akka.japi.Creator;
 import akka.japi.pf.ReceiveBuilder;
-import com.ob.event.EventLogic;
 
 /**
  * Created by boris on 1/30/2017.
  */
 public class AkkaActor extends AbstractActor {
-    private final AkkaEventLogic logic;
-    public AkkaActor(AkkaEventLogic logic) {
-        this.logic = logic;
+    private AkkaEventNodeObject eventNodeObject;
+    public AkkaActor(AkkaEventNodeObject eventNodeObject) {
+        this.eventNodeObject = eventNodeObject;
     }
-    public static Props props(AkkaEventLogic logic) {
+    public static Props props(AkkaEventNodeObject eventNodeObject) {
         return Props.create(new Creator<AkkaActor>() {
             private static final long serialVersionUID = 1L;
             @Override
             public AkkaActor create() throws Exception {
-                return new AkkaActor(logic);
+                return new AkkaActor(eventNodeObject);
             }
         });
     }
-
     @Override
     public void preStart()throws Exception{
         super.preStart();
-        logic.start();
+        eventNodeObject.preStart(getSelf());
     }
     @Override
     public void postStop()throws Exception{
-        logic.stop();
+        eventNodeObject.preStop();
         super.postStop();
     }
 
     @Override
     public Receive createReceive() {
         final ReceiveBuilder receiveBuilder = receiveBuilder();
-        if(logic.getMatchers().isEmpty()){
+        if(eventNodeObject.getMatchers().isEmpty()){
             receiveBuilder.matchAny(message -> {
                 try {
-                    logic.onEvent(message, null);
+                    eventNodeObject.onEvent(message, null);
                 }catch (Exception e){}
             });
         }else{
-            for(Class clazz : logic.getMatchers()){
+            for(Class clazz : eventNodeObject.getMatchers()){
                 receiveBuilder.match(clazz, message -> {
                     try {
-                        logic.onEvent(message, clazz);
+                        eventNodeObject.onEvent(message, clazz);
                     }catch (Exception e){}
                     return;
                 });

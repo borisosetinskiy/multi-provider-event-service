@@ -3,41 +3,35 @@ package com.ob.event.akka;
 import com.ob.event.EventServiceConfig;
 
 public class AkkaEventServiceConfig implements EventServiceConfig {
-    private int unionConcurrency = 64;
-    private int eventConcurrency = 64;
-    private int lookupConcurrency = 16;
-    private int timeoutConcurrency = 64;
+
     private int lookupSize = 5;
     private boolean withExtension;
-    private boolean hasEventTimeoutService;
-    private boolean hasEventNodeRouterService;
-    private boolean hasEventNodeScheduledService;
+    private boolean withEventTimeoutService;
+    private boolean withEventNodeRouterService;
+    private boolean withEventNodeScheduledService;
 
-
-
-
-    public boolean isHasEventTimeoutService() {
-        return hasEventTimeoutService;
+    public boolean isWithEventTimeoutService() {
+        return withEventTimeoutService;
     }
 
-    public void setHasEventTimeoutService(boolean hasEventTimeoutService) {
-        this.hasEventTimeoutService = hasEventTimeoutService;
+    public void setWithEventTimeoutService(boolean withEventTimeoutService) {
+        this.withEventTimeoutService = withEventTimeoutService;
     }
 
-    public boolean isHasEventNodeRouterService() {
-        return hasEventNodeRouterService;
+    public boolean isWithEventNodeRouterService() {
+        return withEventNodeRouterService;
     }
 
-    public void setHasEventNodeRouterService(boolean hasEventNodeRouterService) {
-        this.hasEventNodeRouterService = hasEventNodeRouterService;
+    public void setWithEventNodeRouterService(boolean withEventNodeRouterService) {
+        this.withEventNodeRouterService = withEventNodeRouterService;
     }
 
-    public boolean isHasEventNodeScheduledService() {
-        return hasEventNodeScheduledService;
+    public boolean isWithEventNodeScheduledService() {
+        return withEventNodeScheduledService;
     }
 
-    public void setHasEventNodeScheduledService(boolean hasEventNodeScheduledService) {
-        this.hasEventNodeScheduledService = hasEventNodeScheduledService;
+    public void setWithEventNodeScheduledService(boolean withEventNodeScheduledService) {
+        this.withEventNodeScheduledService = withEventNodeScheduledService;
     }
 
     public int getLookupSize() {
@@ -46,38 +40,6 @@ public class AkkaEventServiceConfig implements EventServiceConfig {
 
     public void setLookupSize(int lookupSize) {
         this.lookupSize = lookupSize;
-    }
-
-    public int getUnionConcurrency() {
-        return unionConcurrency;
-    }
-
-    public void setUnionConcurrency(int unionConcurrency) {
-        this.unionConcurrency = unionConcurrency;
-    }
-
-    public int getEventConcurrency() {
-        return eventConcurrency;
-    }
-
-    public void setEventConcurrency(int eventConcurrency) {
-        this.eventConcurrency = eventConcurrency;
-    }
-
-    public int getLookupConcurrency() {
-        return lookupConcurrency;
-    }
-
-    public void setLookupConcurrency(int lookupConcurrency) {
-        this.lookupConcurrency = lookupConcurrency;
-    }
-
-    public int getTimeoutConcurrency() {
-        return timeoutConcurrency;
-    }
-
-    public void setTimeoutConcurrency(int timeoutConcurrency) {
-        this.timeoutConcurrency = timeoutConcurrency;
     }
 
     public boolean isWithExtension() {
