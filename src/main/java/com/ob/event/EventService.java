@@ -1,5 +1,7 @@
 package com.ob.event;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -12,5 +14,8 @@ public interface EventService extends EventNodeFactory, EventEndPointService, Se
     default Optional<ExecutableContext> getExecutableContext(){return Optional.empty();}
     default Optional<EventServiceExtension> getExtension(){return Optional.empty();}
     default Optional<EventStream> getEventStream(){return Optional.empty();}
+    default Collection<EventNode> getEventNodes(){
+        return Collections.EMPTY_LIST;
+    }
 }
 
