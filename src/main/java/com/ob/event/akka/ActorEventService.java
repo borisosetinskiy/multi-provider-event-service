@@ -17,13 +17,13 @@ import static com.ob.event.akka.ActorUtil.sender;
 /**
  * Created by boris on 1/28/2017.
  */
-public class ActorEventService implements EventService<Future, Class> {
+public class ActorEventService implements EventService {
     private final Map<String, EventNodeUnion> unions;
     private final Map<String, EventNode> eventNodes;
     private final String name;
     private final ActorService actorService;
-    private final Optional<EventStream<Class>> akkaEventStream;
-    private final Optional<ExecutableContext<Future>> akkaExecutableContext;
+    private final Optional<EventStream> akkaEventStream;
+    private final Optional<ExecutableContext> akkaExecutableContext;
     private final Optional<EventServiceExtension> eventServiceExtension;
     private final Optional<EventService> self;
 
@@ -36,12 +36,12 @@ public class ActorEventService implements EventService<Future, Class> {
     }
 
     @Override
-    public Optional<EventStream<Class>> getEventStream() {
+    public Optional<EventStream> getEventStream() {
         return akkaEventStream;
     }
 
     @Override
-    public Optional<ExecutableContext<Future>> getExecutableContext() {
+    public Optional<ExecutableContext> getExecutableContext() {
         return akkaExecutableContext;
     }
 
@@ -70,7 +70,7 @@ public class ActorEventService implements EventService<Future, Class> {
         this.self = Optional.of(this);
     }
 
-    class AkkaEventStream implements EventStream<Class> {
+    class AkkaEventStream implements EventStream {
         /*Unblocked method*/
         @Override
         public void publishStream(Object event) {
@@ -79,13 +79,13 @@ public class ActorEventService implements EventService<Future, Class> {
 
         /*Unblocked method*/
         @Override
-        public void subscribeStream(EventNode subscriber, Class event) {
+        public void subscribeStream(EventNode subscriber, Object event) {
             getActorService().getActorSystem().eventStream().subscribe((ActorRef) subscriber.unwrap(), event);
         }
 
         /*Unblocked method*/
         @Override
-        public void removeStream(EventNode subscriber, Class event) {
+        public void removeStream(EventNode subscriber, Object event) {
             getActorService().getActorSystem().eventStream().unsubscribe((ActorRef) subscriber.unwrap(), event);
         }
     }
@@ -297,7 +297,7 @@ public class ActorEventService implements EventService<Future, Class> {
         return unions.getOrDefault(unionName, EventNodeUnion.EMPTY);
     }
 
-    class AkkaExecutableContext implements ExecutableContext<Future> {
+    class AkkaExecutableContext implements ExecutableContext {
         private final ExecutionContext executionContext;
 
         AkkaExecutableContext(ExecutionContext executionContext) {
@@ -305,8 +305,8 @@ public class ActorEventService implements EventService<Future, Class> {
         }
 
         @Override
-        public <V> Future<V> execute(Callable<V> callable) {
-            return future(callable, executionContext);
+        public <V> V execute(Callable callable) {
+            return (V)future(callable, executionContext);
         }
 
     }
