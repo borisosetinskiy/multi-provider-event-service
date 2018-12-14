@@ -288,6 +288,11 @@ public class ActorEventService implements EventService {
     }
 
     @Override
+    public Collection<EventNode> getEventNodes() {
+        return eventNodes.values();
+    }
+
+    @Override
     public EventNode getEventNode(String name) {
         return eventNodes.getOrDefault(name, EventNodeObject.EMPTY);
     }
