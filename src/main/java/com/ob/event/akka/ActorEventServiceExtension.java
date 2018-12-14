@@ -17,7 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class ActorEventServiceExtension implements EventServiceExtension<Object> {
+public class ActorEventServiceExtension implements EventServiceExtension {
     private static final Logger logger = LoggerFactory.getLogger(ActorEventServiceExtension.class);
 
     private Optional<EventTimeoutService> akkaEventTimeoutService;
