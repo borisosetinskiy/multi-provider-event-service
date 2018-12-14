@@ -221,7 +221,7 @@ public class ActorEventService implements EventService {
 
             @Override
             public EventLogic getEventLogic() {
-                return eventLogic;
+                return eventLogic.unwrap();
             }
 
             @Override

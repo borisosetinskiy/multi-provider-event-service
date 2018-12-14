@@ -3,10 +3,11 @@ package com.ob.event.akka;
 import com.ob.event.EventLogic;
 import com.ob.event.EventNode;
 import com.ob.event.EventNodeObject;
+import com.ob.event.Wrapper;
 
 import java.util.Set;
 
-public class AkkaEventLogicObject implements EventLogic, AkkaEventLogicOption {
+public class AkkaEventLogicObject implements EventLogic, AkkaEventLogicOption, Wrapper<EventLogic> {
     private final EventLogic eventLogic;
     private final AkkaEventLogicOption eventOption;
     public AkkaEventLogicObject(EventLogic eventLogic
@@ -56,5 +57,10 @@ public class AkkaEventLogicObject implements EventLogic, AkkaEventLogicOption {
     @Override
     public void onEventNode(EventNodeObject eventNode) {
         eventLogic.onEventNode(eventNode);
+    }
+
+    @Override
+    public EventLogic unwrap(){
+        return eventLogic;
     }
 }
