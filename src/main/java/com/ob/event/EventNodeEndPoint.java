@@ -5,4 +5,7 @@ package com.ob.event;
  */
 public interface EventNodeEndPoint extends EventPoint{
     default void tell(Object event, EventNode sender){}
+    default void tell(Object event){
+        tell(event, null);
+    }
 }

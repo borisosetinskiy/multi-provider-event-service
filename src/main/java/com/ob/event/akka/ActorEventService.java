@@ -179,17 +179,17 @@ public class ActorEventService implements EventService {
                     props = props.withDispatcher(eventLogic.withDispatcher());
                 if (eventLogic.withMailbox() != null)
                     props = props.withMailbox(eventLogic.withMailbox());
-                actorService.getActorSystem().actorOf(props, name);
+                this.actor = actorService.getActorSystem().actorOf(props, name);
             }
 
             @Override
             public Set<Class> getMatchers() {
-                return eventLogic.getMatchers();
+                return eventLogic.getMatchers()!= null ? eventLogic.getMatchers(): Collections.EMPTY_SET;
             }
 
             @Override
             public void preStart(ActorRef actor) {
-                this.actor = actor;
+//                this.actor = actor;
                 eventLogic.onEventNode(this);
                 eventLogic.preStart();
             }

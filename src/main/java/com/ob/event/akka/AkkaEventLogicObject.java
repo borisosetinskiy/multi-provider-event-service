@@ -9,11 +9,12 @@ import java.util.Set;
 
 public class AkkaEventLogicObject implements EventLogic, AkkaEventLogicOption, Wrapper<EventLogic> {
     private final EventLogic eventLogic;
-    private final AkkaEventLogicOption eventOption;
+    private AkkaEventLogicOption eventOption;
     public AkkaEventLogicObject(EventLogic eventLogic
             ) {
         this.eventLogic = eventLogic;
-        this.eventOption = (AkkaEventLogicOption)eventLogic.getEventLogicOption();
+        if(eventLogic.getEventLogicOption() != null)
+            this.eventOption = (AkkaEventLogicOption)eventLogic.getEventLogicOption();
     }
     @Override
     public void preStart() {
@@ -25,15 +26,15 @@ public class AkkaEventLogicObject implements EventLogic, AkkaEventLogicOption, W
     }
     @Override
     public String withDispatcher() {
-        return eventOption.withDispatcher();
+        return eventOption != null ? eventOption.withDispatcher(): null;
     }
     @Override
     public String withMailbox() {
-        return eventOption.withMailbox();
+        return eventOption != null ? eventOption.withMailbox(): null;
     }
     @Override
     public Set<Class> getMatchers() {
-        return eventOption.getMatchers();
+        return eventOption != null ? eventOption.getMatchers() : null;
     }
     @Override
     public void tell(Object event, EventNode sender) {
