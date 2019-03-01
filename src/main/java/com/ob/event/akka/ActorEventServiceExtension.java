@@ -1,6 +1,7 @@
 package com.ob.event.akka;
 
 import akka.actor.ActorRef;
+import akka.routing.ActorRefRoutee;
 import akka.routing.Router;
 import akka.routing.RoutingLogic;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -11,6 +12,7 @@ import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 import scala.concurrent.duration.FiniteDuration;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
@@ -102,7 +104,7 @@ public class ActorEventServiceExtension implements EventServiceExtension {
                 private Map<String, EventNode> nodes = new ConcurrentHashMap<>();
 
                 {
-                    router = new Router((RoutingLogic) routerLogicFactory.create().unwrap());
+                    router = new Router((RoutingLogic) routerLogicFactory.create().unwrap(), new ArrayList<>());
                 }
 
                 @Override
@@ -112,7 +114,7 @@ public class ActorEventServiceExtension implements EventServiceExtension {
 
                 @Override
                 public void addNode(EventNode node) {
-                    router.addRoutee((ActorRef) node.unwrap());
+                    router = router.addRoutee(new ActorRefRoutee((ActorRef) node.unwrap()));
                     nodes.put(node.name(), node);
                 }
 
