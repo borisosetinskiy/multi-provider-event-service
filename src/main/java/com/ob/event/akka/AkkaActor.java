@@ -13,14 +13,9 @@ public class AkkaActor extends AbstractActor {
     public AkkaActor(AkkaEventNodeObject eventNodeObject) {
         this.eventNodeObject = eventNodeObject;
     }
-    public static Props props(AkkaEventNodeObject eventNodeObject) {
-        return Props.create(new Creator<AkkaActor>() {
-            private static final long serialVersionUID = 1L;
-            @Override
-            public AkkaActor create() throws Exception {
-                return new AkkaActor(eventNodeObject);
-            }
-        });
+    static Props props(AkkaEventNodeObject eventNodeObject) {
+        return Props.create(com.ob.event.akka.AkkaActor.class
+                , () -> new com.ob.event.akka.AkkaActor(eventNodeObject));
     }
     @Override
     public void preStart()throws Exception{

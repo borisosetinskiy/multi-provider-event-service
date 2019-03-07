@@ -270,7 +270,8 @@ public class ActorEventService implements EventService {
     @Override
     public EventNode create(final String name, String unionId, final EventLogicFactory eventLogicFactory) {
         final String unionName = (unionId == null) ? name : unionId;
-        final EventNode<ActorRef> node = eventNodes.computeIfAbsent(name, s -> createEventNodeObject(s, unionName, eventLogicFactory));
+        final EventNode<ActorRef> node = eventNodes.computeIfAbsent(name
+                , s -> createEventNodeObject(s, unionName, eventLogicFactory));
         unions.computeIfAbsent(unionName, s -> createEventNodeUnion(s)).add(node);
         return node;
     }
