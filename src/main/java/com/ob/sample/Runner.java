@@ -28,7 +28,8 @@ public class Runner {
         EventNode eventNodeRoma = eventService.create(roma.name(), "RomaRoom", () -> roma);
 
         while (true) {
-            eventNode.tell(new Message("Roma", roma.name()) );
+            eventService.tellEvent(null, helloWorldLogic.name(), new Message("Roma", roma.name()));
+//            eventNode.tell(new Message("Roma", roma.name()) );
             try{
                 Thread.sleep(1000*5);
             }catch (Exception e){}

@@ -110,7 +110,7 @@ public class ActorEventService implements EventService {
     /*Unblocked method*/
     @Override
     public void tellEvent(EventNode sender, String recipient, Object event) {
-        actorService.getActorSystem().actorSelection(recipient).tell(event, sender(sender));
+        eventNodes.get(recipient).tell(event, sender);
     }
 
     EventNodeUnion createEventNodeUnion(String unionName) {
