@@ -62,9 +62,9 @@ public class Runner {
         public void tell(Object event, EventNode sender){
             eventNodeObject.tell(event, sender);
         }
-        public EventLogicOption getEventLogicOption(){
-            return new AkkaEventLogicOption(){};
-        }
+//        public EventLogicOption getEventLogicOption(){
+//            return new AkkaEventLogicOption(){};
+//        }
     }
 
 }
