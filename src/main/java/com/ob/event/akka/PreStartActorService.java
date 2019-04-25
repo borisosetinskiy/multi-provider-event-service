@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 public abstract class PreStartActorService<READY> {
     private static final Logger logger = LoggerFactory.getLogger(PreStartActorService.class);
     protected ActorEventService eventService;
+    protected EventNodeObject eventNodeObject;
     private String destinationId;
 
     public PreStartActorService(ActorEventService eventService, String destinationId) {
@@ -31,7 +32,7 @@ public abstract class PreStartActorService<READY> {
 
         @Override
         public void onEventNode(EventNodeObject eventNodeObject) {
-
+            PreStartActorService.this.eventNodeObject = eventNodeObject;
         }
 
         @Override
