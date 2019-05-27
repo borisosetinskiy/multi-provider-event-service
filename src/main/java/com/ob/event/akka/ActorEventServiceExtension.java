@@ -4,7 +4,6 @@ import akka.actor.ActorRef;
 import akka.routing.ActorRefRoutee;
 import akka.routing.Router;
 import akka.routing.RoutingLogic;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.ob.event.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,8 +148,12 @@ public class ActorEventServiceExtension implements EventServiceExtension {
         private EventNodeObject eventNodeObject;
         private Map<Object, EventTimeout> events = new ConcurrentHashMap();
         protected AkkaEventTimeoutService() {
-            scheduler = Executors.newScheduledThreadPool(1, new ThreadFactoryBuilder().setDaemon(true)
-                    .setNameFormat(name() + "-%d").build());
+            scheduler = Executors.newScheduledThreadPool(1
+                    , r -> {
+                        Thread t = new Thread(r, "SCHEDULER");
+                        t.setDaemon(true);
+                        return t;
+                    });
         }
 
         @Override

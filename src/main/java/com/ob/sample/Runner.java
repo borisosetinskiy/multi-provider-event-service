@@ -3,12 +3,9 @@ package com.ob.sample;
 import com.ob.event.*;
 import com.ob.event.akka.ActorEventService;
 import com.ob.event.akka.ActorEventServiceBuilder;
-import com.ob.event.akka.AkkaEventLogicOption;
 import com.ob.event.akka.AkkaEventServiceConfig;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
-
-import java.util.concurrent.Executors;
 
 public class Runner {
 
@@ -24,12 +21,12 @@ public class Runner {
         HelloWorldLogic helloWorldLogic = new HelloWorldLogic();
         EventNode eventNode = eventService.create(helloWorldLogic.name(), "HelloWorldGroup", () -> helloWorldLogic);
 
-        Roma roma = new Roma();
-        EventNode eventNodeRoma = eventService.create(roma.name(), "RomaRoom", () -> roma);
+        Name name = new Name();
+        EventNode eventNodeName = eventService.create(name.name(), "NameRoom", () -> name);
 
         while (true) {
-            eventService.tellEvent(null, helloWorldLogic.name(), new Message("Roma", roma.name()));
-//            eventNode.tell(new Message("Roma", roma.name()) );
+            eventService.tellEvent(null, helloWorldLogic.name(), new Message("Name", name.name()));
+//            eventNode.tell(new Message("Name", name.name()) );
             try{
                 Thread.sleep(1000*5);
             }catch (Exception e){}
@@ -37,11 +34,11 @@ public class Runner {
 
 
     }
-    static class Roma implements EventLogic{
+    static class Name implements EventLogic{
         private EventNodeObject eventNodeObject;
         @Override
         public String name() {
-            return "Roma";
+            return "Name";
         }
 
         @Override
