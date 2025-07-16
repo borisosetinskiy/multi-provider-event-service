@@ -1,3 +1,3 @@
 # multi-provider-event-service
-event bus adapter for LMAX, Akka, RXjava
+event bus adapter for Akka
 it will help to use same interfaces for different frameworks
